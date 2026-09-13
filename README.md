@@ -1,14 +1,58 @@
-# roberta-squad2-question-answering-pipeline
+# RoBERTa-SQuAD2 Question Answering Pipeline
 
-DIMER pipeline scaffold for **deepset/roberta-base-squad2** — Extractive question answering.
+DIMER-oriented inference wrapper for **deepset/roberta-base-squad2** (RoBERTa-base fine-tuned by deepset on SQuAD 2.0, licence CC-BY-4.0), pinned to an immutable Hugging Face revision. The repository exposes extractive question answering — one question and one context in, one context span or the SQuAD 2.0 empty "no answer" out — with the upstream null-vs-span decision rule, a supply-chain check of the local weight snapshot, SQuAD-style `exact_match`/`f1` helpers, and machine-readable provenance.
 
-| | |
-|---|---|
-| Upstream model | [`deepset/roberta-base-squad2`](https://huggingface.co/deepset/roberta-base-squad2) |
-| Pinned revision | `adc3b06f79f797d1c575d5479d6f5efe54a9e3b4` (resolved 2026-09-13) |
-| Upstream license | `cc-by-4.0` (verified on the Hub 2026-09-13; re-check at the pinned revision before release) |
-| Weight files to stage | `model.safetensors` |
-| Status | scaffold only — no weights downloaded, no pipeline code yet |
+## Upstream alignment
 
-Weights are staged under `weights/` and are git-ignored. This repository follows the
-MODEL_CARD_SPEC 1.1 / NOTEBOOK_SPEC 1.1 conventions used by the other `*-pipeline` repos.
+- Model: `deepset/roberta-base-squad2`
+- Revision: `adc3b06f79f797d1c575d5479d6f5efe54a9e3b4`
+- Upstream weight license: CC-BY-4.0 — attribution: deepset (Branden Chan, Timo Möller, Malte Pietsch, Tanay Soni), https://huggingface.co/deepset/roberta-base-squad2, weights redistributed unmodified; see `docs/WEIGHTS.md`
+- Upstream task: extractive question answering with unanswerable questions (`RobertaForQuestionAnswering`, fine-tuned on SQuAD 2.0 from `FacebookAI/roberta-base`)
+- Repository adaptation: **none**; inference only
+
+## Quick start
+
+```python
+from roberta_question_answering_pipeline import RoBERTaQuestionAnsweringPipeline
+
+pipe = RoBERTaQuestionAnsweringPipeline.from_pretrained()   # verifies weights/roberta-base-squad2 first
+context = "The Eiffel Tower is named after the engineer Gustave Eiffel, whose company built it from 1887 to 1889."
+result = pipe.answer("Who designed the Eiffel Tower?", context)
+print(result["answer"], result["score"])          # 'Gustave Eiffel' 0.94  (CPU smoke on a longer context)
+print(result["answerable"], result["no_answer_score"])
+```
+
+`answer(question, context, *, max_answer_tokens=15)` takes two non-empty strings of at most 500 / 3,000 characters (`MAX_QUESTION_CHARS`, `MAX_CONTEXT_CHARS`) that tokenise to at most 64 / 384 byte-level BPE tokens (`MAX_QUESTION_TOKENS`, `MAX_CONTEXT_TOKENS`; longer inputs are rejected, never truncated or windowed — the caller chunks long documents) and `max_answer_tokens` in 1..64 (`MAX_ANSWER_TOKENS`). The decision rule (`DECISION_RULE`) is the upstream `transformers` question-answering rule with `handle_impossible_answer=True`: softmax the start and end logits over the context tokens plus `<s>`, score the best span as `P_start(i)·P_end(j)` with `i ≤ j < i + max_answer_tokens`, score "no answer" as `P_start(<s>)·P_end(<s>)`, and return the empty string when the null score is larger. Every result carries `answer`, `score`, `start`/`end` (character offsets into `context`), `no_answer_score`, `best_span_score`, `answerable`, both token counts, `max_answer_tokens`, `decision_rule`, `device`, `source`, `model_id` and `model_revision`. `exact_match(prediction, gold_answers)` and `f1(prediction, gold_answers)` implement the SQuAD scoring normalisation (an empty gold list means unanswerable); `evaluation_report(result, gold_answers=None)` wraps them for one pair.
+
+## Weights layout
+
+```
+weights/roberta-base-squad2/
+  config.json  merges.txt  model.safetensors  special_tokens_map.json  tokenizer_config.json  vocab.json
+  README.md  dimer-base-manifest.json  (no tokenizer.json at this revision)
+```
+
+`from_pretrained()` calls `stage_missing_files()` (fetches absent manifest entries at the pinned revision, only with `allow_download=True`) then `verify_snapshot()` (size + SHA-256 of every entry), and loads `RobertaForQuestionAnswering` + `AutoTokenizer` (a `RobertaTokenizerFast` built from `vocab.json`/`merges.txt`) with `local_files_only=True` and `trust_remote_code=False`. Without a manifest it raises unless `allow_download=True`. See `docs/WEIGHTS.md`.
+
+## Tests
+
+```
+pip install -e . --no-deps
+pytest -q -o addopts= tests
+```
+
+Tests are offline: they use an injected fake encoder and token counter plus temporary manifests, never the weights.
+
+## Tutorial
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kurtvalcorza/roberta-squad2-question-answering-pipeline/blob/main/tutorials/roberta_question_answering_colab.ipynb)
+
+`tutorials/roberta_question_answering_colab.ipynb` is declared `TASK-INFERENCE` under DIMER Notebook Specification 1.1 and is **standalone** (§3.6): generated by `tools/build_notebook.py`, it carries the pipeline module, model identity, manifest digests and runtime pins, so the exported notebook runs without this repository (parity enforced by `tests/test_notebook_parity.py`; see `tutorials/README.md`). Its default path authors one synthetic context and three questions in code (two answerable, one deliberately unanswerable; no download), surfaces the ceilings and `DECISION_RULE` and validates the pairs into an input manifest with `validate_inputs` before any model work, stages the git-ignored `model.safetensors` with `stage_missing_files(..., allow_download=True)` and digest-verifies the snapshot with `verify_snapshot`, answers through `RoBERTaQuestionAnsweringPipeline.answer` with an explicit `max_answer_tokens`, reads `answer`/`score`/`no_answer_score`/`answerable` with their semantics (products of softmax masses, not calibrated probabilities; no shipped threshold beyond the null-vs-span comparison), writes an `evaluation_report` that scores the authored gold answers with `exact_match`/`f1` as a `sample-sanity` verdict, and exports a CSV plus JSON provenance. BYOD is optional and gated off by default. See `docs/release-verification.md` for the release gate.
+
+## Release status
+
+**Candidate.** Static/unit checks do not constitute clean-runtime notebook evidence. The clean-runtime run of the tutorial is pending; complete `docs/release-verification.md` against the exact release revision before calling the notebook release-grade. See `STATUS.md`.
+
+## Licensing
+
+This repository's code is Apache-2.0 (`LICENSE`). The packaged upstream weights are CC-BY-4.0 and require attribution to deepset; see `docs/WEIGHTS.md` and `MODEL_CARD.md`.

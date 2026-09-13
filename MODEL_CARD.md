@@ -3,6 +3,8 @@ license: cc-by-4.0
 model_card_spec: "1.1"
 pipeline_tag: question-answering
 base_model: deepset/roberta-base-squad2
+date_published: "2020-01-22"
+date_published_source: "earliest commit in the Hugging Face Hub repository history (the Hub `createdAt` 2022-03-02 is the Hub migration stamp, not a release date)"
 ---
 
 # RoBERTa-base SQuAD2 (DIMER package v0.1.0) — Extractive Reader (Question Answering)
@@ -11,7 +13,6 @@ base_model: deepset/roberta-base-squad2
 [![Upstream GitHub](https://img.shields.io/badge/Upstream%20GitHub-deepset--ai%2Fhaystack-181717?style=flat&logo=github&logoColor=white)](https://github.com/deepset-ai/haystack)
 [![arXiv Paper](https://img.shields.io/badge/arXiv-1907.11692-b31b1b.svg)](https://arxiv.org/abs/1907.11692)
 [![License: CC-BY-4.0](https://img.shields.io/badge/License-CC--BY--4.0-blue.svg)](https://creativecommons.org/licenses/by/4.0/)
-[![Pipeline](https://img.shields.io/badge/Pipeline-roberta--squad2--question--answering--pipeline-2ea44f?style=flat&logo=github)](https://github.com/kurtvalcorza/roberta-squad2-question-answering-pipeline)
 
 > [!WARNING]
 > ⚠️ **Provided for research, training, and evaluation purposes only.** Model weights are redistributed unmodified under their upstream license, which controls your use, including any commercial use or redistribution; the accompanying code and notebooks are released under this repository's license. All of it is supplied **"as is"**, without warranty of any kind, and has not been validated for production, clinical, or safety-critical use. Running the notebooks downloads third-party weights and datasets governed by their own licenses and consumes compute on your own Colab/Kaggle account. To the maximum extent permitted by law, the maintainers of this repository and the DIMER platform accept no liability for any damages arising from their use. Hosting implies no affiliation with or endorsement by the original authors.
@@ -28,7 +29,7 @@ This pipeline provides a ready-to-run interactive Google Colab notebook that exe
 
 ---
 
-###### Description
+#### Description
 
 `deepset/roberta-base-squad2` is the 125-million-parameter `roberta-base` encoder of Liu et al. (arXiv:1907.11692) with a two-logit span head, fine-tuned by deepset on SQuAD 2.0 for extractive question answering, pinned here to revision `adc3b06f79f797d1c575d5479d6f5efe54a9e3b4`. The architecture, read from the snapshot `config.json`, is a 12-layer bidirectional Transformer encoder (`hidden_size` 768, 12 heads, `intermediate_size` 3072, `max_position_embeddings` 514) over a 50,265-entry byte-level BPE vocabulary (`vocab.json` + `merges.txt`, case preserved). At inference the encoder reads the pair `<s> question </s></s> context </s>` once and emits, for every token, a start logit and an end logit; the answer is the context span whose start and end scores multiply highest, unless the `<s>` position scores higher on both, in which case the model says the context does not answer the question — the SQuAD 2.0 "no answer" case the checkpoint was trained on (pinned README: "trained on question-answer pairs, including unanswerable questions"). No adaptation happens at inference: no training, in-context conditioning or retrieval. What this repository adds is packaging: the `RoBERTaQuestionAnsweringPipeline` class in `src/roberta_question_answering_pipeline/pipeline.py`, digest verification of the local snapshot (`verify_snapshot`, `stage_missing_files`), input validation with named ceilings, a NumPy re-implementation of the upstream `transformers` null-vs-span rule (`DECISION_RULE`), a fixed output contract, and the SQuAD-style `exact_match`/`f1` helpers plus the `validate_inputs` and `evaluation_report` stage helpers.
 

@@ -7,7 +7,7 @@ date_published: "2020-01-22"
 date_published_source: "earliest commit in the Hugging Face Hub repository history (the Hub `createdAt` 2022-03-02 is the Hub migration stamp, not a release date)"
 ---
 
-# RoBERTa-base SQuAD2 (DIMER package v0.1.0) — Extractive Reader (Question Answering)
+# RoBERTa-base SQuAD2 — Extractive Reader (Question Answering)
 
 [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-deepset%2Froberta--base--squad2-ffcc4d?style=flat)](https://huggingface.co/deepset/roberta-base-squad2)
 [![Upstream GitHub](https://img.shields.io/badge/Upstream%20GitHub-deepset--ai%2Fhaystack-181717?style=flat&logo=github&logoColor=white)](https://github.com/deepset-ai/haystack)

@@ -93,7 +93,7 @@ they are measurements for the stated runtime, not general estimates.
 
 | Date (UTC) | Commit / notebook blob | Executor | Path exercised | Wall | Outcome |
 |---|---|---|---|---|---|
-| | | | Default sample path | | pending — queued to the GPU lane |
+| 2026-09-14 | `9473216` / `5a73f16cf5cd` | Kaggle CPU (`kurtvalcorza/dimer-nb2-roberta-question-answering` v1) | Default sample path | 233.8 s | **PASSED** — 8/8 ok code cells executed cleanly, 16 files, 498 MB staged |
 
 ## Current status
 

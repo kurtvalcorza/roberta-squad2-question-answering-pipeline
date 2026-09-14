@@ -2,6 +2,7 @@
 license: cc-by-4.0
 model_card_spec: "1.1"
 pipeline_tag: question-answering
+task: "Others - Extractive Question Answering"
 base_model: deepset/roberta-base-squad2
 date_published: "2020-01-22"
 date_published_source: "earliest commit in the Hugging Face Hub repository history (the Hub `createdAt` 2022-03-02 is the Hub migration stamp, not a release date)"

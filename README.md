@@ -56,3 +56,7 @@ Tests are offline: they use an injected fake encoder and token counter plus temp
 ## Licensing
 
 This repository's code is Apache-2.0 (`LICENSE`). The packaged upstream weights are CC-BY-4.0 and require attribution to deepset; see `docs/WEIGHTS.md` and `MODEL_CARD.md`.
+
+## AI Assistance Disclosure
+
+This tutorial and its accompanying documentation were developed with generative AI assistance for code development and technical writing under maintainer direction. The maintainer remains responsible for reviewing the implementation, validating results, and making release decisions. AI assistance does not constitute independent verification, provider endorsement, or release approval.

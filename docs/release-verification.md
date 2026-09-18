@@ -105,7 +105,7 @@ Before changing the registry status from `Candidate` to `Release-grade`:
      `max_answer_tokens` ceiling probe); `pipe.answer` on the three authored questions with every sanity check
      `True` (the card-pass smoke returned `Gustave Eiffel`, `1887 to 1889` and the empty answer; a different span on
      another runtime is a finding to record, not a failure);
-   - Section 6: the always-null baseline (0.0 / 0.0 — the sample has no unanswerable questions), the
+   - Section 6: the always-null baseline (0.25 / 0.25 — the sample has no unanswerable questions; one gold span, the initial `A`, normalises to the empty string under the SQuAD article-stripping rule), the
      lexical-overlap baseline (exact-match 0.0, F1 ≈ 8.6) and the frozen model's test score (exact-match ≈ 8.0,
      F1 ≈ 12.4, answered rate ≈ 43.5 % on CPU float32), with the cell's assertion that the frozen F1 beats the null
      baseline;
@@ -135,7 +135,7 @@ A known-failing default path in the supported runtime blocks release (REL11).
 
 | Notebook | Commit / notebook blob | Date (UTC) | Executor | Outcome |
 |---|---|---|---|---|
-| `roberta_question_answering_colab.ipynb` (`E2E`) | `__LOCAL_ROW__` | 2026-09-18 | Local pre-flight harness (Windows, CPython 3.12.10, CPU, `google.colab` shim, pins pre-installed) | PASS — pre-flight only, **not** promotion evidence |
+| `roberta_question_answering_colab.ipynb` (`E2E`) | `45eac74` / `c0686c47` | 2026-09-18 | Local pre-flight harness (Windows, CPython 3.12.10, CPU, `google.colab` shim, pins pre-installed) | PASS — pre-flight only, **not** promotion evidence |
 | `roberta_question_answering_colab.ipynb` (`TASK-INFERENCE`, superseded) | `9473216` / `5a73f16cf5cd` | 2026-09-14 | Kaggle CPU (`kurtvalcorza/dimer-nb2-roberta-question-answering` v1) | PASSED — 8/8 code cells, 233.8 s; evidence for the earlier inference-only notebook, not for the `E2E` blob |
 
 ## Recorded executions
@@ -147,7 +147,7 @@ runtime, not general estimates.
 
 | Date (UTC) | Commit / notebook blob | Executor | Path exercised | Wall | Outcome |
 |---|---|---|---|---|---|
-| 2026-09-18 | `__LOCAL_ROW__` | Local pre-flight harness (Windows, CPython 3.12.10, CPU float32, `torch 2.14.0+cu130` with `CUDA_VISIBLE_DEVICES=-1`, `transformers 4.57.6`) | `__LOCAL_EXEC__` |
+| 2026-09-18 | `45eac74` / `c0686c47` | Local pre-flight harness (Windows, CPython 3.12.10, CPU float32, `torch 2.14.0+cu130` with `CUDA_VISIBLE_DEVICES=-1`, `transformers 4.57.6`) | Default sample path (install skipped, pins pre-installed → three carried modules → inline manifest assert → `stage_missing_files` fetched 0 of 7 entries because the snapshot was pre-staged → `verify_snapshot` 7 files → `from_pretrained` on CPU → `fetch_corpus` served from the pre-staged cache after its digest check → 10,000 + 1,000 questions read, 1,000 / 200 / 400 cut by article over 358 / 5 / 16 articles with `check_split_disjoint` clean and digests `19021a6f…` / `c2ba4720…` / `3598b03c…` → four dataset refusals → fit check dropping `train-0362` only → input manifest + `max_answer_tokens` refusal probe → three authored answers with every sanity check `True` → null + lexical baselines → frozen evaluation → `adapt` → validation + test evaluation → six unseen questions → adapter export → reload parity) | 462.9 s | **PASSED** — 11/11 code cells; always-null 0.25 / 0.25 (one gold `A` normalises to empty), lexical overlap 0.0 / 8.58; frozen test exact-match 8.0 / F1 12.38, answered 43.5 % (17.7 s); `adapt` 14,177,282 of 124,056,578 params, 999 questions, 2 epochs, 410.2 s, validation F1 14.14 → 31.63 → 30.91 (`best_epoch` 1, train loss 3.223 → 2.986); **adapted test exact-match 17.25 / F1 26.49 (Δ +9.25 / +14.11), answered 100 %**; six unseen questions exact-match 16.67 / F1 29.76 `measured-small-sample`, single-pair report `sample-sanity`; adapter 56,713,104 B / 34 tensors, SHA-256 `754fd982…`; reload parity 8/8; six exports written. Pre-flight; hosted clean-runtime run still required |
 | 2026-09-14 | `9473216` / `5a73f16cf5cd` (`TASK-INFERENCE`, superseded) | Kaggle CPU (`kurtvalcorza/dimer-nb2-roberta-question-answering` v1) | Default sample path of the inference-only notebook: one synthetic passage and three questions, `stage_missing_files` fetching `model.safetensors` from the Hub, `verify_snapshot`, `answer`, `sample-sanity` report | 233.8 s | **PASSED** — 8/8 code cells, 16 files, 498 MB staged; does not cover the `E2E` blob |
 
 ## Current status

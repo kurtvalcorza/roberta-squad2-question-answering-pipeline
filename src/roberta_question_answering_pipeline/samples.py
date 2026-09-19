@@ -41,8 +41,9 @@ CORPUS_LICENSE = "CC BY-SA 3.0 (Bartolo et al. 2020; adversarialqa.github.io)"
 CORPUS_QUESTIONS = {"train": 10_000, "dev": 1_000}
 DEFAULT_CACHE_DIR = Path("weights") / "adversarialqa"
 # Sample filters: the pipeline refuses pairs over MAX_QUESTION_TOKENS (64) / MAX_CONTEXT_TOKENS (384) with the
-# real tokenizer, so the sample keeps passages short enough that none is refused (about 4 chars per BPE
-# token on English Wikipedia text; the build record found 0 of the sampled pairs over either ceiling).
+# real tokenizer, so the sample keeps passages short enough that almost none is refused (about 4 chars per
+# BPE token on English Wikipedia text; the build record's notebook run dropped 1 of the 1,600 sampled records
+# at the context ceiling, which `check_fit` reports rather than the sample silently absorbing).
 MAX_SAMPLE_CONTEXT_CHARS = 1_300
 MAX_SAMPLE_QUESTION_CHARS = 200
 SAMPLE_SEED = 42
@@ -82,8 +83,6 @@ def fetch_corpus(*, cache_dir: str | Path | None = None, fetcher: Any = None) ->
 def flatten_squad(data: Mapping[str, Any], *, prefix: str = "") -> list[dict[str, Any]]:
     """SQuAD-format ``{"data": [{"title", "paragraphs": [{"context", "qas": [...]}]}]}`` → flat records
     carrying the article ``title`` (used for article-disjoint splitting)."""
-    if not isinstance(data, Mapping) or "data" not in data:
-        raise ValueError("SQuAD-format JSON must be an object with a 'data' list")
     if not isinstance(data, Mapping) or "data" not in data:
         raise ValueError("SQuAD-format JSON must be an object with a 'data' list")
     records = []

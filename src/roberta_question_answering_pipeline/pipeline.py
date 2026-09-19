@@ -548,45 +548,58 @@ class RoBERTaQuestionAnsweringPipeline:
             progress(entry)
         best_f1 = entry["val"]["f1"] if entry["val"] else -math.inf
         best_state = {k: v.detach().clone() for k, v in model.state_dict().items() if k in wanted}
+        initial_state = {k: v.clone() for k, v in best_state.items()}
         best_epoch = 0
         generator = torch.Generator().manual_seed(seed)
-        for epoch in range(1, epochs + 1):
-            model.train()
-            order = torch.randperm(len(train_checked), generator=generator).tolist()
-            losses = []
-            for start in range(0, len(order), batch_size):
-                batch = [train_checked[i] for i in order[start : start + batch_size]]
-                encoded = tokenizer(
-                    [r["question"] for r in batch],
-                    [r["context"] for r in batch],
-                    return_tensors="pt",
-                    padding=True,
-                    truncation=False,
-                    return_offsets_mapping=True,
-                )
-                positions = [self._span_positions(encoded, i, r) for i, r in enumerate(batch)]
-                encoded.pop("offset_mapping")
-                out = model(
-                    input_ids=encoded["input_ids"].to(device),
-                    attention_mask=encoded["attention_mask"].to(device),
-                    start_positions=torch.tensor([s for s, _e in positions], device=device),
-                    end_positions=torch.tensor([e for _s, e in positions], device=device),
-                )
-                optimiser.zero_grad(set_to_none=True)
-                out.loss.backward()
-                torch.nn.utils.clip_grad_norm_(params, 1.0)
-                optimiser.step()
-                losses.append(float(out.loss.detach()))
+        try:
+            for epoch in range(1, epochs + 1):
+                model.train()
+                order = torch.randperm(len(train_checked), generator=generator).tolist()
+                losses = []
+                for start in range(0, len(order), batch_size):
+                    batch = [train_checked[i] for i in order[start : start + batch_size]]
+                    encoded = tokenizer(
+                        [r["question"] for r in batch],
+                        [r["context"] for r in batch],
+                        return_tensors="pt",
+                        padding=True,
+                        truncation=False,
+                        return_offsets_mapping=True,
+                    )
+                    positions = [self._span_positions(encoded, i, r) for i, r in enumerate(batch)]
+                    encoded.pop("offset_mapping")
+                    out = model(
+                        input_ids=encoded["input_ids"].to(device),
+                        attention_mask=encoded["attention_mask"].to(device),
+                        start_positions=torch.tensor([s for s, _e in positions], device=device),
+                        end_positions=torch.tensor([e for _s, e in positions], device=device),
+                    )
+                    optimiser.zero_grad(set_to_none=True)
+                    out.loss.backward()
+                    torch.nn.utils.clip_grad_norm_(params, 1.0)
+                    optimiser.step()
+                    losses.append(float(out.loss.detach()))
+                model.eval()
+                entry = {"epoch": epoch, "train_loss": sum(losses) / len(losses), "val": score_val()}
+                history.append(entry)
+                if progress:
+                    progress(entry)
+                current = entry["val"]["f1"] if entry["val"] else math.inf
+                if current > best_f1 or not entry["val"]:
+                    best_f1 = current
+                    best_state = {k: v.detach().clone() for k, v in model.state_dict().items() if k in wanted}
+                    best_epoch = epoch
+        except BaseException:
+            # Transactional: a failure in training, validation or the progress callback leaves the base
+            # exactly as it was, with every parameter frozen again.
+            restore = dict(model.state_dict())
+            restore.update(initial_state)
+            model.load_state_dict(restore, strict=True)
             model.eval()
-            entry = {"epoch": epoch, "train_loss": sum(losses) / len(losses), "val": score_val()}
-            history.append(entry)
-            if progress:
-                progress(entry)
-            current = entry["val"]["f1"] if entry["val"] else math.inf
-            if current > best_f1 or not entry["val"]:
-                best_f1 = current
-                best_state = {k: v.detach().clone() for k, v in model.state_dict().items() if k in wanted}
-                best_epoch = epoch
+            for param in model.parameters():
+                param.requires_grad_(False)
+            self.adapter = None
+            raise
         merged = dict(model.state_dict())
         merged.update(best_state)
         model.load_state_dict(merged, strict=True)
@@ -653,12 +666,20 @@ class RoBERTaQuestionAnsweringPipeline:
         )
         return out
 
-    def load_artifact(self, artifact_dir: str | Path) -> dict[str, Any]:
-        """Verify an adapter's manifest and digest, then overwrite exactly the tensors it carries."""
-        root = Path(artifact_dir)
-        manifest = json.loads((root / ARTIFACT_MANIFEST_NAME).read_text(encoding="utf-8"))
+    def _check_artifact_manifest(self, root: Path, manifest: Mapping[str, Any]) -> Path:
+        """Refuse an artifact whose manifest is not exactly the one this pipeline writes: the supported
+        format and version, the pinned base (id, revision, weight file, digest), exactly one file entry
+        named `adapter.safetensors` that resolves inside the artifact directory, and a recorded
+        `trainable_encoder_layers` in range. Nothing is deserialised here. The digest check that follows
+        detects corruption or drift of the weights relative to the adjacent manifest; it is not
+        authenticity against an actor who can replace both files."""
         if manifest.get("format") != ARTIFACT_FORMAT:
             raise ValueError(f"artifact format {manifest.get('format')!r} != {ARTIFACT_FORMAT!r}")
+        if manifest.get("format_version") != ARTIFACT_FORMAT_VERSION:
+            raise ValueError(
+                f"artifact format_version {manifest.get('format_version')!r} is not the supported "
+                f"{ARTIFACT_FORMAT_VERSION!r}"
+            )
         base = manifest.get("base_model", {})
         if (base.get("id"), base.get("revision"), base.get("weight_sha256")) != (
             MODEL_ID,
@@ -666,17 +687,45 @@ class RoBERTaQuestionAnsweringPipeline:
             WEIGHT_SHA256,
         ):
             raise ValueError("artifact was adapted from a different base model, revision or weight file")
+        if base.get("weight_file", WEIGHT_FILE) != WEIGHT_FILE:
+            raise ValueError("artifact was adapted from a different base weight file")
+        files = manifest.get("files")
+        if not isinstance(files, list) or len(files) != 1:
+            raise ValueError("artifact manifest must list exactly one file")
+        entry = files[0]
+        if not isinstance(entry, Mapping) or entry.get("path") != ARTIFACT_WEIGHTS_NAME:
+            raise ValueError(f"artifact manifest must name exactly {ARTIFACT_WEIGHTS_NAME!r}")
+        weights_path = (root / entry["path"]).resolve()
+        if weights_path.parent != root.resolve():
+            raise ValueError("artifact weight path must resolve inside the artifact directory")
+        adapter = manifest.get("adapter")
+        layers = adapter.get("trainable_encoder_layers") if isinstance(adapter, Mapping) else None
+        if isinstance(layers, bool) or not isinstance(layers, int):
+            raise ValueError("artifact manifest does not record an integer trainable_encoder_layers")
+        if not isinstance(manifest.get("tensors"), list):
+            raise ValueError("artifact manifest must list its tensors")
+        return weights_path
+
+    def load_artifact(self, artifact_dir: str | Path) -> dict[str, Any]:
+        """Verify an adapter's manifest, digest and exact tensor set **before** deserialising, then overwrite
+        exactly the tensors it carries."""
+        root = Path(artifact_dir)
+        manifest = json.loads((root / ARTIFACT_MANIFEST_NAME).read_text(encoding="utf-8"))
+        weights_path = self._check_artifact_manifest(root, manifest)
         entry = manifest["files"][0]
-        weights_path = root / entry["path"]
         if not weights_path.is_file():
             raise FileNotFoundError(f"artifact weights missing: {weights_path}")
         if _sha256(weights_path) != entry["sha256"] or weights_path.stat().st_size != entry["bytes"]:
             raise ValueError(f"{entry['path']}: digest or size mismatch; refusing to load")
+        # The exact tensor set the recorded configuration implies — no subset, no extra, no other layer.
+        expected = sorted(self._trainable_names(manifest["adapter"]["trainable_encoder_layers"]))
+        if sorted(manifest["tensors"]) != expected:
+            raise ValueError("artifact tensor list does not match its recorded configuration")
         model, _ = self._require_model()
         from safetensors.torch import load_file
 
         tensors = load_file(str(weights_path))
-        if sorted(tensors) != manifest["tensors"]:
+        if sorted(tensors) != expected:
             raise ValueError("artifact tensor names differ from its manifest")
         state = model.state_dict()
         for key, value in tensors.items():

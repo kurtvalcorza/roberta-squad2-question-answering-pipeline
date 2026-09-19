@@ -69,7 +69,7 @@ Tests are offline: they use an injected fake encoder, token counter and corpus f
 
 ## Release status
 
-**Candidate** — the notebook source passes all static checks and one local CPU pre-flight execution of the committed blob is recorded; a clean run in a supported hosted runtime is still required (see `STATUS.md` and `docs/release-verification.md`). The earlier inference-only notebook's Kaggle pass does not carry over to the `E2E` blob.
+**Release-grade** — the `E2E` notebook blob `7d2ba4d1` (committed at `d1e30a5`) executed top-to-bottom in a clean Kaggle Tesla T4 runtime on 2026-09-19 (11/11 ok (1 restart after install cell), 306.0 s); the record is in `docs/release-verification.md` and `STATUS.md`. Static and unit checks — including the standalone generator parity checks — are necessary but were never the evidence; the hosted run is. A later change to the carried modules or the notebook returns the status to Candidate until re-verified.
 
 ## Licensing
 

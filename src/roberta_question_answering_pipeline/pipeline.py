@@ -279,6 +279,24 @@ def evaluation_report(
     }
 
 
+def _remember_base(base: dict[str, Any], model: Any, names: Sequence[str]) -> None:
+    """Keep a copy of each named tensor's pinned-base value the first time it is about to change."""
+    state = model.state_dict()
+    for name in names:
+        if name not in base:
+            base[name] = state[name].detach().clone()
+
+
+def _restore_base(base: Mapping[str, Any], model: Any) -> list[str]:
+    """Put every tensor that adaptation or an artifact overlay changed back to its pinned-base value."""
+    if not base:
+        return []
+    state = dict(model.state_dict())
+    state.update(base)
+    model.load_state_dict(state, strict=True)
+    return sorted(base)
+
+
 @dataclass
 class RoBERTaQuestionAnsweringPipeline:
     """``_runner(question, context)`` -> ``(start_logits (T,), end_logits (T,), offsets (T, 2),
@@ -292,6 +310,9 @@ class RoBERTaQuestionAnsweringPipeline:
     adapter: dict[str, Any] | None = field(default=None, repr=False)
     _model: Any = field(default=None, repr=False)
     _tokenizer: Any = field(default=None, repr=False)
+    # Pinned-base values of every tensor adapt() or load_artifact() has changed: each adaptation
+    # starts from the verified base, never from a previous run's weights (2026-10-05 sweep, SWP-F).
+    _base_state: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @classmethod
     def from_pretrained(
@@ -522,6 +543,10 @@ class RoBERTaQuestionAnsweringPipeline:
 
         torch.manual_seed(seed)
         model, tokenizer = self._require_model()
+        current = model.state_dict()
+        previous_state = {k: current[k].detach().clone() for k in self._base_state}
+        restored = self.restore_base()
+        _remember_base(self._base_state, model, names)
         started = time.perf_counter()
         wanted = set(names)
         for name, param in model.named_parameters():
@@ -594,6 +619,7 @@ class RoBERTaQuestionAnsweringPipeline:
             # exactly as it was, with every parameter frozen again.
             restore = dict(model.state_dict())
             restore.update(initial_state)
+            restore.update(previous_state)  # a failed call leaves the weights as they were before it
             model.load_state_dict(restore, strict=True)
             model.eval()
             for param in model.parameters():
@@ -619,12 +645,26 @@ class RoBERTaQuestionAnsweringPipeline:
             "n_train": len(train_checked),
             "n_val": len(val_checked),
             "seed": seed,
+            "started_from": "pinned base"
+            + (f" (restored {len(restored)} tensors an earlier run changed)" if restored else ""),
             "history": history,
             "seconds": round(time.perf_counter() - started, 2),
         }
         return dict(self.adapter)
 
     # ---- artifacts ------------------------------------------------------------------------------------
+
+    def restore_base(self) -> list[str]:
+        """Return the model to the pinned base: undo every earlier adapt() or load_artifact()
+        overlay. Returns the names of the restored tensors (empty when the model was never changed)."""
+        if self._model is None:
+            self.adapter = None
+            return []
+        restored = _restore_base(self._base_state, self._model)
+        if restored:
+            self._model.eval()
+        self.adapter = None
+        return restored
 
     def save_artifact(self, output_dir: str | Path, metadata: Mapping[str, Any] | None = None) -> Path:
         """Write the adapted encoder-block and span-head tensors as safetensors plus a base manifest."""
@@ -727,6 +767,8 @@ class RoBERTaQuestionAnsweringPipeline:
         tensors = load_file(str(weights_path))
         if sorted(tensors) != expected:
             raise ValueError("artifact tensor names differ from its manifest")
+        self.restore_base()
+        _remember_base(self._base_state, model, sorted(tensors))
         state = model.state_dict()
         for key, value in tensors.items():
             if key not in state or not (

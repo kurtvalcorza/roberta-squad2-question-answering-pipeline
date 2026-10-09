@@ -74,11 +74,15 @@ def qa_metrics(predictions: Sequence[str], golds: Sequence[Sequence[str]]) -> di
         raise ValueError("no predictions to score")
     em = [exact_match(p, g) for p, g in zip(predictions, golds, strict=True)]
     f1s = [f1(p, g) for p, g in zip(predictions, golds, strict=True)]
+    answered = [score for score, p in zip(f1s, predictions, strict=True) if p]
     return {
         "n": len(predictions),
         "exact_match": 100.0 * sum(em) / len(em),
         "f1": 100.0 * sum(f1s) / len(f1s),
-        "answered_rate": 100.0 * sum(1 for p in predictions if p) / len(predictions),
+        "answered_rate": 100.0 * len(answered) / len(predictions),
+        # F1 over the questions that got a span at all (None when none did): separates "how well it reads
+        # when it answers" from "how often it answers" (RQA-M2).
+        "f1_answered": 100.0 * sum(answered) / len(answered) if answered else None,
         "unanswerable_gold": sum(1 for g in golds if not g),
         "definitions": dict(METRIC_DEFINITIONS),
     }

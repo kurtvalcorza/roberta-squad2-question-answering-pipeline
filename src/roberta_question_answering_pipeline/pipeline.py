@@ -50,6 +50,10 @@ DECISION_RULE = (
     "context; the empty answer is returned when no_answer_score > best span score (upstream "
     "handle_impossible_answer=True rule); scores are products of softmax masses, not calibrated probabilities"
 )
+FORCED_SPAN_RULE = (
+    "forced span (allow_null=False): the best span inside the context is always returned and the empty "
+    "answer never is; no_answer_score is still reported"
+)
 WEIGHT_FILE = "model.safetensors"
 WEIGHT_SHA256 = (
     "ac5db66fdcfecb400345d09787b71009d60805ef9883451071669cf951b5e2c7"  # manifest digest of WEIGHT_FILE
@@ -279,6 +283,24 @@ def evaluation_report(
     }
 
 
+def _remember_base(base: dict[str, Any], model: Any, names: Sequence[str]) -> None:
+    """Keep a copy of each named tensor's pinned-base value the first time it is about to change."""
+    state = model.state_dict()
+    for name in names:
+        if name not in base:
+            base[name] = state[name].detach().clone()
+
+
+def _restore_base(base: Mapping[str, Any], model: Any) -> list[str]:
+    """Put every tensor that adaptation or an artifact overlay changed back to its pinned-base value."""
+    if not base:
+        return []
+    state = dict(model.state_dict())
+    state.update(base)
+    model.load_state_dict(state, strict=True)
+    return sorted(base)
+
+
 @dataclass
 class RoBERTaQuestionAnsweringPipeline:
     """``_runner(question, context)`` -> ``(start_logits (T,), end_logits (T,), offsets (T, 2),
@@ -292,6 +314,9 @@ class RoBERTaQuestionAnsweringPipeline:
     adapter: dict[str, Any] | None = field(default=None, repr=False)
     _model: Any = field(default=None, repr=False)
     _tokenizer: Any = field(default=None, repr=False)
+    # Pinned-base values of every tensor adapt() or load_artifact() has changed: each adaptation
+    # starts from the verified base, never from a previous run's weights (2026-10-05 sweep, SWP-F).
+    _base_state: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @classmethod
     def from_pretrained(
@@ -345,9 +370,20 @@ class RoBERTaQuestionAnsweringPipeline:
         return _check_token_counts(self._count_tokens(question), self._count_tokens(context))
 
     def answer(
-        self, question: str, context: str, *, max_answer_tokens: int = DEFAULT_MAX_ANSWER_TOKENS
+        self,
+        question: str,
+        context: str,
+        *,
+        max_answer_tokens: int = DEFAULT_MAX_ANSWER_TOKENS,
+        allow_null: bool = True,
     ) -> dict[str, Any]:
-        """Extract the best context span or the SQuAD 2.0 empty answer (upstream null-vs-span rule)."""
+        """Extract the best context span or the SQuAD 2.0 empty answer (upstream null-vs-span rule).
+
+        ``allow_null=False`` always returns the best span (the "forced span" reading): the null score is
+        still reported but never wins. On a corpus with no unanswerable questions it is the baseline that
+        separates "stopped abstaining" from "reads better" (RQA-M2)."""
+        if not isinstance(allow_null, bool):
+            raise ValueError("allow_null must be a bool")
         n_question, n_context = self._validate(question, context, max_answer_tokens)
         start, end, offsets, context_mask = self._runner(question, context)
         start, end = np.asarray(start, dtype=np.float64), np.asarray(end, dtype=np.float64)
@@ -373,7 +409,7 @@ class RoBERTaQuestionAnsweringPipeline:
         best_index = int(np.argmax(outer))
         span_start, span_end = np.unravel_index(best_index, outer.shape)
         best_span_score = float(outer[span_start, span_end])
-        if no_answer_score > best_span_score:
+        if allow_null and no_answer_score > best_span_score:
             answer_text, char_start, char_end, score = "", 0, 0, no_answer_score
         else:
             char_start, char_end = int(offsets[span_start][0]), int(offsets[span_end][1])
@@ -389,7 +425,8 @@ class RoBERTaQuestionAnsweringPipeline:
             "question_tokens": n_question,
             "context_tokens": n_context,
             "max_answer_tokens": max_answer_tokens,
-            "decision_rule": DECISION_RULE,
+            "decision_rule": DECISION_RULE if allow_null else FORCED_SPAN_RULE,
+            "allow_null": allow_null,
             "device": self.device,
             "source": self.source,
             "model_id": MODEL_ID,
@@ -422,9 +459,15 @@ class RoBERTaQuestionAnsweringPipeline:
         return {"fitting": fitting, "dropped": dropped, "n_fitting": len(fitting), "n_dropped": len(dropped)}
 
     def evaluate(
-        self, records: Sequence[Mapping[str, Any]], *, max_answer_tokens: int = DEFAULT_MAX_ANSWER_TOKENS
+        self,
+        records: Sequence[Mapping[str, Any]],
+        *,
+        max_answer_tokens: int = DEFAULT_MAX_ANSWER_TOKENS,
+        allow_null: bool = True,
     ) -> dict[str, Any]:
-        """Answer every record and score the predictions against its gold list (corpus exact-match and F1)."""
+        """Answer every record and score the predictions against its gold list (corpus exact-match and F1).
+
+        ``allow_null=False`` scores the forced-span reading: the best span, never the empty answer."""
         from .metrics import qa_metrics
         from .samples import validate_dataset
 
@@ -433,14 +476,18 @@ class RoBERTaQuestionAnsweringPipeline:
         predictions = []
         for record in checked:
             predictions.append(
-                self.answer(record["question"], record["context"], max_answer_tokens=max_answer_tokens)[
-                    "answer"
-                ]
+                self.answer(
+                    record["question"],
+                    record["context"],
+                    max_answer_tokens=max_answer_tokens,
+                    allow_null=allow_null,
+                )["answer"]
             )
         metrics = qa_metrics(predictions, [[a["text"] for a in r["answers"]] for r in checked])
         metrics.update(
             {
                 "max_answer_tokens": max_answer_tokens,
+                "allow_null": allow_null,
                 "verdict": "measured" if len(checked) >= MIN_SCORED_RECORDS else "measured-small-sample",
                 "adapted": self.adapter is not None,
                 "seconds": round(time.perf_counter() - started, 3),
@@ -522,6 +569,10 @@ class RoBERTaQuestionAnsweringPipeline:
 
         torch.manual_seed(seed)
         model, tokenizer = self._require_model()
+        current = model.state_dict()
+        previous_state = {k: current[k].detach().clone() for k in self._base_state}
+        restored = self.restore_base()
+        _remember_base(self._base_state, model, names)
         started = time.perf_counter()
         wanted = set(names)
         for name, param in model.named_parameters():
@@ -594,6 +645,7 @@ class RoBERTaQuestionAnsweringPipeline:
             # exactly as it was, with every parameter frozen again.
             restore = dict(model.state_dict())
             restore.update(initial_state)
+            restore.update(previous_state)  # a failed call leaves the weights as they were before it
             model.load_state_dict(restore, strict=True)
             model.eval()
             for param in model.parameters():
@@ -619,12 +671,26 @@ class RoBERTaQuestionAnsweringPipeline:
             "n_train": len(train_checked),
             "n_val": len(val_checked),
             "seed": seed,
+            "started_from": "pinned base"
+            + (f" (restored {len(restored)} tensors an earlier run changed)" if restored else ""),
             "history": history,
             "seconds": round(time.perf_counter() - started, 2),
         }
         return dict(self.adapter)
 
     # ---- artifacts ------------------------------------------------------------------------------------
+
+    def restore_base(self) -> list[str]:
+        """Return the model to the pinned base: undo every earlier adapt() or load_artifact()
+        overlay. Returns the names of the restored tensors (empty when the model was never changed)."""
+        if self._model is None:
+            self.adapter = None
+            return []
+        restored = _restore_base(self._base_state, self._model)
+        if restored:
+            self._model.eval()
+        self.adapter = None
+        return restored
 
     def save_artifact(self, output_dir: str | Path, metadata: Mapping[str, Any] | None = None) -> Path:
         """Write the adapted encoder-block and span-head tensors as safetensors plus a base manifest."""
@@ -727,6 +793,8 @@ class RoBERTaQuestionAnsweringPipeline:
         tensors = load_file(str(weights_path))
         if sorted(tensors) != expected:
             raise ValueError("artifact tensor names differ from its manifest")
+        self.restore_base()
+        _remember_base(self._base_state, model, sorted(tensors))
         state = model.state_dict()
         for key, value in tensors.items():
             if key not in state or not (

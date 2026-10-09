@@ -12,7 +12,8 @@ training pool) and `3_droberta/dev.json` (1,000 questions over 21 articles, spli
 validation and test). The `test.json` member ships without answers and is not used.
 
 A record is ``{id, question, context, answers}`` with ``answers`` a list of ``{text, answer_start}`` (the
-SQuAD convention; an empty list means unanswerable — AdversarialQA has none, so the null answer scores 0).
+SQuAD convention; an empty list means unanswerable). AdversarialQA has none, so the always-null answer scores
+about 0: exactly 0.25 on the default test split, where one gold answer ("A") normalises to the empty string.
 """
 
 from __future__ import annotations
@@ -332,10 +333,21 @@ def split_dataset(
     seed: int = 0,
 ) -> dict[str, list[dict[str, Any]]]:
     """Seeded split of a BYOD dataset into train/validation/test **by passage**: every question on the
-    same passage lands in the same split, so a test passage is never seen in training."""
+    same passage lands in the same split, so a test passage is never seen in training.
+
+    The training split needs ``MIN_RECORDS`` (8); validation and test need one record each. With one
+    question per passage that takes ``min_split_records()`` records (12 at the default fractions); when
+    several questions share a passage more are needed, because a passage's questions stay together."""
     if not (0.0 <= val_fraction < 1.0 and 0.0 < test_fraction < 1.0 and val_fraction + test_fraction < 1.0):
         raise ValueError("fractions must satisfy 0 <= val < 1, 0 < test < 1, val + test < 1")
-    checked = validate_dataset(records)["records"]
+    minimum = min_split_records(val_fraction=val_fraction, test_fraction=test_fraction)
+    checked = validate_dataset(records, min_records=1)["records"]
+    if len(checked) < minimum:
+        raise ValueError(
+            f"the dataset has {len(checked)} records; at least {minimum} are required so that "
+            f"{MIN_RECORDS} stay for training after the {test_fraction:.0%} test and {val_fraction:.0%} "
+            "validation splits (more when several questions share a passage)"
+        )
     groups = list(_group_by(checked, "context").values())
     random.Random(seed).shuffle(groups)
     n_test = max(1, round(len(checked) * test_fraction))
@@ -348,11 +360,27 @@ def split_dataset(
             splits["validation"].extend(group)
         else:
             splits["train"].extend(group)
+    sizes = ", ".join(f"{name} {len(part)}" for name, part in splits.items())
     if len(splits["train"]) < MIN_RECORDS:
         raise ValueError(
-            f"split leaves {len(splits['train'])} training records; at least {MIN_RECORDS} are required"
+            f"the split of {len(checked)} records over {len(groups)} passages leaves {len(splits['train'])} "
+            f"training records ({sizes}); at least {MIN_RECORDS} are required — add records, or passages, "
+            "since every question on one passage stays in one split"
+        )
+    if n_val and not splits["validation"]:
+        raise ValueError(
+            f"the split of {len(checked)} records over {len(groups)} passages leaves the validation split "
+            f"empty ({sizes}); add records on more passages"
         )
     return splits
+
+
+def min_split_records(*, val_fraction: float = 0.15, test_fraction: float = 0.2) -> int:
+    """The smallest dataset (one question per passage) whose split keeps ``MIN_RECORDS`` for training."""
+    n = MIN_RECORDS
+    while n - max(1, round(n * test_fraction)) - round(n * val_fraction) < MIN_RECORDS:
+        n += 1
+    return n
 
 
 def load_byod_dataset(path: str | Path) -> list[dict[str, Any]]:

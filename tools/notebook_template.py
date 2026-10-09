@@ -1,4 +1,4 @@
-"""Per-repository template for tools/build_notebook.py (NOTEBOOK_SPEC 2.0 §4 standalone carrier).
+"""Per-repository template for tools/build_notebook.py (NOTEBOOK_SPEC 2.2 §4 standalone carrier).
 
 Only the task-specific prose and stage cells live here. Runtime install, the embedded pipeline
 modules (metrics.py, pipeline.py, samples.py), and the model pin/stage/verify cells are produced by
@@ -20,30 +20,73 @@ TEMPLATE = {
     "notebook_name": "roberta_question_answering_colab.ipynb",
     "profile": "E2E",
     "mode": "GUIDED",
+    # SWP-R (2026-10-05 fleet sweep): nothing is pip-installed into the notebook kernel. The fleet's uv isolated-environment
+    # mechanism (build_notebook.py/2.2): managed CPython, a size- and SHA-256-verified uv wheel, and a lock compiled from the
+    # pyproject pins with `uv pip compile pyproject.toml --python-version 3.12 --python-platform x86_64-manylinux_2_28
+    # --generate-hashes --only-binary :all: -o tutorials/requirements-colab.lock.txt` (uv 0.12.15).
+    "isolated_runtime": True,
+    "infrastructure_labels": True,
+    "managed_python": "3.12.12",
+    "uv": {
+        "version": "0.12.15",
+        "url": "https://files.pythonhosted.org/packages/1e/fd/432451d732917c49152a291de3ef171aa6b0f1a22d39780fb2c1f085ca4c/uv-0.12.15-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+        "bytes": 20081404,
+        "sha256": "aee9802f46bae436bd91751bb33ddeb379ef1596b5c19df193219d545d244b60",
+    },
+    "lock": "tutorials/requirements-colab.lock.txt",
     "run_all": (
-        "Selecting **Run all** in a fresh supported runtime installs the pinned dependencies, stages and digest-verifies the "
+        "Selecting **Run all** in a fresh supported runtime builds an isolated environment from the hash-locked pins (nothing is "
+        "installed into the notebook's own Python, so no restart is needed and Run all completes in one pass), stages and digest-verifies the "
         "pinned `deepset/roberta-base-squad2` snapshot (safetensors, 496 MB), fetches the digest-pinned AdversarialQA "
         "corpus from the project site (9.0 MB, no credential), filters the dRoBERTa subset and cuts it by article into "
         "1,000 / 200 / 400 training, validation and test questions, drops any record the pipeline's token ceilings would "
         "refuse, answers three authored questions through the inference contract with an input manifest and a rejection "
         "probe, scores the frozen model on the test split with exact-match and F1 beside the always-null and "
-        "lexical-overlap baselines, runs a bounded fine-tuning of the last two encoder blocks and the span head on the "
+        "lexical-overlap baselines and beside its own forced-span reading (the best span, with the empty answer disabled), runs a bounded fine-tuning of the last two encoder blocks and the span head on the "
         "training questions with validation-F1 epoch selection, scores the held-out split again, answers new questions "
         "with the adapted model, exports the adapter as safetensors with a manifest, and reloads that artifact into a "
         "fresh pipeline to verify answer parity. The default path needs no repository clone, no DIMER worker or service, "
-        "no credential, no upload dialog and no configuration edit (NOTEBOOK_SPEC 2.0 §5). On CPU the whole path takes "
-        "about six minutes of model time after the downloads; a CUDA runtime is used automatically when present."
+        "no credential, no upload dialog and no configuration edit (NOTEBOOK_SPEC 2.2 §5). On the local CPU build workstation "
+        "(Windows, Intel Core Ultra 9 275HX, float32) the model stages took about six minutes after the downloads; Colab's CPU "
+        "runtime is unmeasured and likely several times slower (an estimate). A CUDA runtime is used automatically when "
+        "present: the hosted Kaggle Tesla T4 run of 19 September 2026 took 306 s for the whole notebook."
     ),
     "byod": (
         "After the tutorial workflow completes, set `USE_BYOD = True` in Section 4 and re-run from that cell to supply your own "
-        "question–answer pairs as a JSON array of `{{id, question, context, answers}}` records, a SQuAD-format JSON file, a "
-        "JSONL file, or a CSV with columns `id, question, context, answer_text, answer_start`. They pass through the same "
+        "question–answer pairs — as `BYOD_PATH` (a path in the runtime, which works on Colab, Kaggle and Jupyter) or, when it is empty, "
+        "through the Colab upload dialog — as a JSON array of `{id, question, context, answers}` records, a SQuAD-format JSON file, a "
+        "JSONL file, or a CSV with columns `id, question, context, answer_text, answer_start` — at least 12 records (more when "
+        "several questions share a passage). They pass through the same "
         "validation, seeded passage-disjoint split, fit check, baselines, fine-tuning, held-out evaluation, inference, "
         "artifact export and reload-parity cells as the AdversarialQA sample. The expected schema and the ceilings are stated "
         "in the Prerequisites and in Section 4, and uploaded files stay inside this runtime. BYOD is optional and never part "
         "of the default path."
     ),
     "pipeline_class": "RoBERTaQuestionAnsweringPipeline",
+    "guided": {
+        "opening": [
+            '**Who this notebook is for.** The intended audience is a learner who knows basic Python, has used Colab or Jupyter, and wants to see how an extractive '
+            'question-answering reader picks an answer span (or no answer) from a passage, how it is scored with exact-match and F1 against honest baselines, and '
+            'what a bounded fine-tuning changes — including what it trades away. No prior experience with RoBERTa or SQuAD is assumed; terms are explained where '
+            'they first matter and again in the **Glossary** at the end. CPU works (about six minutes of model time on the local build workstation; Colab CPU is slower and unmeasured); a GPU runtime is faster.\n\n**Input → '
+            'Model → Output.**\n\n| | Answering | Bounded fine-tuning |\n|---|---|---|\n| Input | a question and its passage (at most 64 and 384 tokens) | '
+            'AdversarialQA dRoBERTa questions with gold spans: 1,000 / 200 / 400, article-disjoint |\n| Model | `roberta-base-squad2`: a start/end span head over '
+            'the encoder, with a no-answer option | the same model; only the last two encoder blocks and the span head train (14.2 M of 124.1 M parameters) |\n| '
+            "Output | a span (or `''`), offsets and span / no-answer scores — ranking signals, not probabilities | exact-match and F1 beside always-null and "
+            'lexical-overlap baselines and the frozen model, and a 57 MB adapter that reloads to identical answers |\n\n**How to use this notebook.** Choose a '
+            'runtime (CPU works; **Runtime → Change runtime type → T4 GPU** is faster), then **Runtime → Run all**. Run all completes in one pass: Section 1 '
+            "installs nothing into the notebook's own Python, so no restart is needed. Sections 1–3 are **infrastructure** — the isolated environment, the carried "
+            'package and the model snapshot — and their cells are collapsed; you may run them without studying them. The learning path starts in Section 4. Form '
+            'fields (`# @param`) are the only values meant to be edited, and the defaults reproduce the recorded run. Before each principal result the notebook '
+            'asks you to **Predict**; after it come **What to notice** and a collapsible **Check your reasoning** with a worked answer from the recorded run (the '
+            'Kaggle Tesla T4 run of 19 September 2026 recorded in `docs/release-verification.md`). Every adaptation starts from the pinned base, so re-running '
+            'Section 7 with other settings is a fresh experiment. **Troubleshooting**, a **Glossary** and a **Conclusion** template are at the end. Writing your '
+            'predictions down is optional.\n\n**Roadmap:** 1–3 infrastructure → 4 the AdversarialQA corpus, validation and the split *(evaluation practice)* → 5 the '
+            'fit check and the inference contract *(core concept: spans, no-answer, scores)* → 6 baselines and the frozen model *(evaluation practice)* → 7 bounded '
+            'fine-tuning *(core concept)* → 8 held-out evaluation *(evaluation practice)* → 9 new questions, export and fresh reload *(engineering)* → '
+            'interpretation, troubleshooting, glossary and your conclusion.'
+        ],
+    },
     "weights_key": "roberta-base-squad2",
     "modules": ["pipeline.py", "samples.py", "metrics.py"],
     "entry_module": "pipeline.py",
@@ -90,7 +133,9 @@ TEMPLATE = {
         "below its SQuAD 2.0 dev figures here (the build record measured F1 12.4 on the test split, with the null "
         "answer returned for more than half of the answerable questions), and the fine-tuning question is whether a "
         "small in-distribution adaptation of the last two encoder blocks and the span head recovers ground on held-out "
-        "articles. Two metrics are implemented in the carried `metrics.py` (corpus **exact-match** and **F1** with the "
+        "articles. This corpus has **no unanswerable questions**, so part of any gain can come from the model simply ceasing to "
+        "abstain; the frozen model is therefore also scored with the empty answer disabled — the **forced-span baseline** — "
+        "which separates *stopped saying no answer* from *reads better*. Two metrics are implemented in the carried `metrics.py` (corpus **exact-match** and **F1** with the "
         "official SQuAD 2.0 normalisation), and two **non-neural baselines** — always-null and lexical overlap — show "
         "where a reader that does nothing, or only counts shared words, sits. Nothing here is a quality claim about your "
         "domain: it is one seeded split of one corpus.\n\n"
@@ -105,7 +150,8 @@ TEMPLATE = {
         "it by article without leakage; drop the records the token ceilings would refuse rather than truncating them; "
         "answer through the public API with an explicit `max_answer_tokens` and read `answer`, `score`, `no_answer_score`, "
         "`best_span_score` and `answerable` correctly (products of softmax masses, not calibrated probabilities); score the "
-        "frozen model against gold spans beside two non-neural baselines and read what the null-answer rate says; run a "
+        "frozen model against gold spans beside two non-neural baselines and its own forced-span reading, and separate the "
+        "null-suppression effect from better reading; run a "
         "bounded fine-tuning with explicit hyperparameters and validation-based epoch selection; evaluate on an "
         "article-disjoint test split; answer new questions; and export a safetensors adapter that reloads against the "
         "pinned base with verified parity."
@@ -119,9 +165,9 @@ TEMPLATE = {
         "repository exposes none of these."
     ),
     "prerequisites": [
-        "- **Runtime:** a fresh supported runtime (Google Colab or Jupyter, Python 3.12). The default path runs on CPU (float32) and uses CUDA automatically when available. CPU is adequate but not fast: the build record measured 6 s to load and digest-verify the 498 MB snapshot, 20 s to answer the 400-question test split, and about 3.5 minutes per epoch of fine-tuning the last two encoder blocks and the span head on 1,000 questions (validation scoring included). The pinned `torch==2.14.0` install and the 496 MB checkpoint are the large downloads of the run.",
+        "- **Runtime:** a fresh supported runtime (Google Colab or Jupyter, Python 3.12). The default path runs on CPU (float32) and uses CUDA automatically when available. CPU is adequate but not fast: the local build workstation (Windows, Intel Core Ultra 9 275HX, float32 — not a hosted runtime) measured 6 s to load and digest-verify the 498 MB snapshot, 20 s to answer the 400-question test split, and about 3.5 minutes per epoch of fine-tuning the last two encoder blocks and the span head on 1,000 questions (validation scoring included); Colab's CPU runtime is unmeasured and likely several times slower (an estimate). On the hosted Kaggle Tesla T4 run of 19 September 2026 the whole notebook took 306 s. Building the isolated environment (the pinned `torch==2.14.0` among its packages; reused on a re-run) and the 496 MB checkpoint are the large downloads of the run.",
         "- **Knowledge:** basic Python; what an encoder-only Transformer is; what span extraction means; why a reader can return a fluent-looking wrong span, or an empty answer for a question the passage does answer; what exact-match and F1 measure and why neither is a human judgement.",
-        "- **Data contract:** records are `{{id, question, context, answers}}` — a question, its passage and a list of `{{text, answer_start}}` gold spans (empty for unanswerable), each `text` found verbatim at its offset; questions at most `MAX_QUESTION_CHARS` (500) characters and `MAX_QUESTION_TOKENS` (64) BPE tokens, passages at most `MAX_CONTEXT_CHARS` (3,000) characters and `MAX_CONTEXT_TOKENS` (384) tokens, enforced by rejecting, never by truncating or windowing; ids matching `[A-Za-z0-9_.:-]{{1,64}}` and unique; a dataset needs 8..20,000 records; every question on the same passage lands in the same split so a test passage is never trained on. BYOD accepts a JSON array, SQuAD-format JSON, JSONL or CSV in that shape.",
+        "- **Data contract:** records are `{id, question, context, answers}` — a question, its passage and a list of `{text, answer_start}` gold spans (empty for unanswerable), each `text` found verbatim at its offset; questions at most `MAX_QUESTION_CHARS` (500) characters and `MAX_QUESTION_TOKENS` (64) BPE tokens, passages at most `MAX_CONTEXT_CHARS` (3,000) characters and `MAX_CONTEXT_TOKENS` (384) tokens, enforced by rejecting, never by truncating or windowing; ids matching `[A-Za-z0-9_.:-]{1,64}` and unique; a training split needs 8..20,000 records, so a BYOD dataset needs **at least 12 records** with one question per passage (8 stay for training after the 20 % test and 15 % validation splits) and more when several questions share a passage, because they stay together; validation and test need at least one record each; every question on the same passage lands in the same split so a test passage is never trained on. BYOD accepts a JSON array, SQuAD-format JSON, JSONL or CSV in that shape.",
         "- **Validation is structural, not semantic:** nothing checks that a question is answerable from its passage beyond the gold text being present at its offset, or that a gold span is the *best* answer — a mislabelled corpus is fine-tuned on without complaint.",
         "- **Privacy:** Do not upload confidential or restricted data to a hosted runtime unless you are authorized to process it there — an internal document set with its question log is exactly that. The default path uploads nothing.",
         "- **External access (data):** besides the Hub, the default path fetches one pinned object (`aqa_v1.0.zip`, 9,018,914 bytes, SHA-256 `f4f3c232…`) from `adversarialqa.github.io` over HTTPS, refused on any mismatch before it is read; only the `3_droberta/train.json` and `3_droberta/dev.json` members are read, and the corpus is CC BY-SA 3.0 (Bartolo et al., 2020).",
@@ -143,22 +189,42 @@ TEMPLATE = {
                 "shape BYOD expects.\n\n"
                 "Look for: 10,000 + 1,000 raw questions, three digests, splits 1,000 / 200 / 400 over 358 / 5 / 16 "
                 "articles, zero unanswerable records, and four refusal probes — a duplicate id, a gold span at the wrong "
-                "offset, a missing field and a dataset too small to split — each rejected before `torch` does anything."
+                "offset, a missing field and a dataset too small to split — each rejected before `torch` does anything. The probes "
+                "are built from the first training record that has a gold answer, so a BYOD set with unanswerable records (empty "
+                "`answers`) is probed the same way. The training split must hold at least 8 records; validation and test need one "
+                "each, so a BYOD set needs at least 12 records, and the split error names the dataset size when it is too small.\n\n"
+                "*Evaluation practice.* **Predict before running:** why split by article rather than by question?"
             ),
             "code": (
                 "import hashlib\n"
                 "import io\n"
                 "import json\n\n"
                 "USE_BYOD = False  # @param {{type:\"boolean\"}}\n"
-                "SPLIT_SEED = 42  # @param {{type:\"integer\"}}\n\n"
+                "SPLIT_SEED = 42  # @param {{type:\"integer\"}}\n"
+                "# A file already in the runtime (works on Colab, Kaggle and Jupyter); empty = the Colab upload dialog.\n"
+                "BYOD_PATH = ''  # @param {{type:\"string\"}}\n"
+                "\n"
                 "os.makedirs('outputs', exist_ok=True)\n"
                 "if USE_BYOD:\n"
-                "    from google.colab import files\n"
-                "    uploaded = files.upload()\n"
-                "    file_name, payload = next(iter(uploaded.items()))\n"
-                "    byod_path = Path('work') / file_name\n"
-                "    byod_path.parent.mkdir(parents=True, exist_ok=True)\n"
-                "    byod_path.write_bytes(payload)\n"
+                "    if BYOD_PATH.strip():\n"
+                "        byod_path = Path(BYOD_PATH.strip()).expanduser()\n"
+                "        if not byod_path.is_file():\n"
+                "            raise FileNotFoundError(f'BYOD_PATH {{BYOD_PATH!r}} is not a file (relative paths start at {{Path.cwd()}}): give one .json, .jsonl, .csv file holding id, question, context and answers.')\n"
+                "        file_name = byod_path.name\n"
+                "    else:\n"
+                "        try:\n"
+                "            from google.colab import files\n"
+                "        except ImportError:\n"
+                "            raise RuntimeError('USE_BYOD is True but BYOD_PATH is empty, and the upload dialog exists only in Google Colab: on Kaggle or Jupyter put the file in the runtime and set BYOD_PATH to its path.') from None\n"
+                "        uploaded = files.upload() or {{}}\n"
+                "        if len(uploaded) != 1:\n"
+                "            raise ValueError(f'Upload exactly one file (received {{len(uploaded)}}; a cancelled dialog sends none): run this cell again.')\n"
+                "        file_name, payload = next(iter(uploaded.items()))\n"
+                "        if not file_name.lower().endswith(('.json', '.jsonl', '.csv')):\n"
+                "            raise ValueError(f'{{file_name}}: upload one .json, .jsonl, .csv file holding id, question, context and answers.')\n"
+                "        byod_path = Path('work') / file_name\n"
+                "        byod_path.parent.mkdir(parents=True, exist_ok=True)\n"
+                "        byod_path.write_bytes(payload)\n"
                 "    records = load_byod_dataset(byod_path)\n"
                 "    splits = split_dataset(records, seed=SPLIT_SEED)\n"
                 "    data_source = 'BYOD (' + file_name + ')'\n"
@@ -168,7 +234,8 @@ TEMPLATE = {
                 "    raw_questions = {{name: len(part) for name, part in corpus.items()}}\n"
                 "    splits = build_sample_dataset(corpus, seed=SPLIT_SEED)\n"
                 "    data_source = f'{{CORPUS_NAME}} {{CORPUS_RELEASE}} dRoBERTa subset ({{CORPUS_LICENSE}})'\n"
-                "dataset_manifests = {{name: validate_dataset(part) for name, part in splits.items()}}\n"
+                "# RQA-M5: training needs MIN_RECORDS; validation and test are checked with a one-record floor.\n"
+                "dataset_manifests = {{name: validate_dataset(part) if name == 'train' else validate_dataset(part, min_records=1) for name, part in splits.items()}}\n"
                 "disjoint = check_split_disjoint(splits)\n"
                 "articles = {{name: len({{r.get('title', '') for r in part}}) for name, part in splits.items()}}\n"
                 "write_dataset_csv(splits['train'], 'outputs/{stem}_train.csv')\n"
@@ -177,18 +244,36 @@ TEMPLATE = {
                 "    print({{name: {{'n': manifest['n_records'], 'unique_contexts': manifest['unique_contexts'], 'unanswerable': manifest['unanswerable'], 'context_chars': manifest['context_chars'], 'digest': manifest['digest'][:16] + '...'}}}})\n"
                 "example = splits['train'][0]\n"
                 "print({{'example': {{'id': example['id'], 'question': example['question'], 'answers': example['answers'], 'context': example['context'][:160] + '...'}}}})\n\n"
+                "# RQA-M4: probe from the first training record that has a gold answer, at an offset where its text is NOT found.\n"
+                "probe_base = splits['train'][:8]\n"
+                "probe_record = next((r for r in splits['train'] if r['answers']), None)\n"
                 "probes = {{\n"
-                "    'duplicate id': [{{**r, 'id': 'same'}} for r in splits['train'][:8]],\n"
-                "    'gold span at the wrong offset': [{{**splits['train'][0], 'answers': [{{'text': splits['train'][0]['answers'][0]['text'], 'answer_start': 0}}]}}, *splits['train'][1:8]],\n"
-                "    'missing field': [{{'id': r['id'], 'question': r['question'], 'context': r['context']}} for r in splits['train'][:8]],\n"
+                "    'duplicate id': [{{**r, 'id': 'same'}} for r in probe_base],\n"
+                "    'missing field': [{{'id': r['id'], 'question': r['question'], 'context': r['context']}} for r in probe_base],\n"
                 "    'too small': splits['train'][:3],\n"
                 "}}\n"
+                "if probe_record is None:\n"
+                "    print({{'probe': 'gold span at the wrong offset', 'skipped': 'no training record has a gold answer'}})\n"
+                "else:\n"
+                "    gold = probe_record['answers'][0]\n"
+                "    n_context = len(probe_record['context'])\n"
+                "    wrong = next(o for o in ((gold['answer_start'] + k) % n_context for k in range(1, n_context + 1)) if probe_record['context'][o:o + len(gold['text'])] != gold['text'])\n"
+                "    others = [r for r in splits['train'] if r is not probe_record][:7]\n"
+                "    probes['gold span at the wrong offset'] = [{{**probe_record, 'answers': [{{'text': gold['text'], 'answer_start': wrong}}]}}, *others]\n"
                 "for name, probe in probes.items():\n"
                 "    try:\n"
                 "        validate_dataset(probe)\n"
                 "        print({{'probe': name, 'verdict': 'accepted'}})\n"
                 "    except (TypeError, ValueError) as exc:\n"
                 "        print({{'probe': name, 'rejected': str(exc)[:110]}})"
+            ),
+        },
+        {
+            "md": (
+                '**What to notice:** 10,000 + 1,000 raw questions, splits 1,000 / 200 / 400 over 358 / 5 / 16 articles, zero unanswerable, and the four refusals.\n\n<details><summary>Check '
+                'your reasoning</summary>Questions on one passage share its wording; questions from one article share its topic. A split by question would score the '
+                'model on passages it trained on. `check_split_disjoint` asserts no passage sits in two splits, and the test articles never appear in training. The '
+                'refusals stop before `torch` runs and name the rule.</details>'
             ),
         },
         {
@@ -209,7 +294,8 @@ TEMPLATE = {
                 "identity. **Score semantics:** every score is a **product of two softmax masses** normalised over the "
                 "passage — a ranking signal that shrinks as the passage grows, **not a calibrated probability** — and no "
                 "no-answer threshold offset ships. Whether the answers are *right* is what Section 6 measures on 400 gold "
-                "spans, not what three authored pairs can tell you."
+                "spans, not what three authored pairs can tell you.\n\n"
+                "**Predict before running:** for the deliberately unanswerable question, will the model return an empty answer?"
             ),
             "code": (
                 "import time\n\n"
@@ -257,10 +343,19 @@ TEMPLATE = {
         },
         {
             "md": (
+                '**What to notice:** the dropped ids from the fit check, `checks`, each answer with `answerable`, and the score fields.\n\n<details><summary>Check your '
+                'reasoning</summary>It should: the null rule compares the no-answer score with the best span score, and the checks confirm the rule is applied '
+                'consistently. The scores are products of softmax masses over the passage — ranking signals, not probabilities — and no threshold ships. Three authored '
+                'questions are plumbing evidence; Section 6 measures.</details>'
+            ),
+        },
+        {
+            "md": (
                 "## 6. Baselines and the frozen model's score on the test split\n\n"
                 "Three numbers frame the adaptation. The **always-null baseline** returns the empty answer for every "
-                "question and scores exactly the unanswerable fraction of the set — zero here, which is the point: on "
-                "AdversarialQA every null answer the frozen model returns is a miss. The **lexical-overlap baseline** "
+                "question and scores exactly the unanswerable fraction of the set — about zero here (0.25 on the default test split: "
+                "one gold answer, *A*, normalises to the empty string once articles are stripped), which is the point: on "
+                "AdversarialQA almost every null answer the frozen model returns is a miss. The **lexical-overlap baseline** "
                 "returns the passage sentence sharing the most normalised tokens with the question — a bag-of-words reader "
                 "with no model, whose F1 comes from partial overlap with long spans. The **frozen model** answers the 400 "
                 "test questions with the `max_answer_tokens` from Section 5 and is scored with the same two metrics: corpus "
@@ -268,9 +363,20 @@ TEMPLATE = {
                 "stripped; an empty gold matches only an empty prediction). Read `answered_rate` beside them: the fraction of "
                 "questions for which a span was returned at all. Expect the frozen F1 to be low — these questions were "
                 "selected because a RoBERTa reader failed them — and expect the null answer for roughly half of the test "
-                "questions, a systematic under-answering that the adaptation in Section 7 is meant to correct."
+                "questions, a systematic under-answering. The fourth number is the **forced-span baseline**: the same frozen model "
+                "with the empty answer disabled (`allow_null=False`), so it always returns its best span. It needs no training, "
+                "and on a corpus with no unanswerable questions it shows how much of the frozen model's low score is abstaining "
+                "rather than misreading. `f1_answered` is the F1 over only the questions that got a span. Whether the frozen F1 beats "
+                "the always-null baseline is recorded as a **verdict**, not asserted, so a run on your own pairs continues either way. "
+                "The cell first puts the pinned base back (`restore_base`) if an earlier Section 7 adapted the model, so a re-run — "
+                "for example with your own data — always measures the frozen model here.\n\n"
+                "*Evaluation practice.* **Predict before running:** will the frozen model's F1 beat the bag-of-words lexical baseline by "
+                "much? And what will its F1 be if the null answer is disabled — about the same, or much higher?"
             ),
             "code": (
+                "# RQA-M3: this cell describes the frozen model, so an earlier adaptation is undone first.\n"
+                "if pipe.restore_base():\n"
+                "    print({{'restored_pinned_base': True, 'note': 'an earlier Section 7 had adapted the model; run Section 7 again before Sections 8 and 9'}})\n"
                 "baseline_null = null_baseline(test_records)\n"
                 "baseline_lexical = lexical_overlap_baseline(test_records)\n"
                 "print({{'always_null_baseline': {{'exact_match': round(baseline_null['exact_match'], 2), 'f1': round(baseline_null['f1'], 2), 'n': baseline_null['n']}}}})\n"
@@ -278,11 +384,26 @@ TEMPLATE = {
                 "t0 = time.perf_counter()\n"
                 "frozen_test = pipe.evaluate(test_records, max_answer_tokens=ANSWER_MAX_TOKENS)\n"
                 "print({{'frozen_model_test': {{'exact_match': round(frozen_test['exact_match'], 2), 'f1': round(frozen_test['f1'], 2), 'answered_rate': round(frozen_test['answered_rate'], 1), 'n': frozen_test['n'], 'verdict': frozen_test['verdict']}}, 'seconds': round(time.perf_counter() - t0, 1)}})\n"
+                "# RQA-M2: the forced-span reading of the same frozen model (best span, never the empty answer).\n"
+                "frozen_forced_test = pipe.evaluate(test_records, max_answer_tokens=ANSWER_MAX_TOKENS, allow_null=False)\n"
+                "print({{'frozen_forced_span_test': {{'exact_match': round(frozen_forced_test['exact_match'], 2), 'f1': round(frozen_forced_test['f1'], 2), 'answered_rate': round(frozen_forced_test['answered_rate'], 1), 'n': frozen_forced_test['n']}}, 'frozen_f1_on_answered_questions': None if frozen_test['f1_answered'] is None else round(frozen_test['f1_answered'], 2)}})\n"
                 "print({{'definitions': frozen_test['definitions']}})\n"
                 "for record in test_records[:3]:\n"
                 "    item = pipe.answer(record['question'], record['context'], max_answer_tokens=ANSWER_MAX_TOKENS)\n"
                 "    print({{'question': record['question'], 'frozen': item['answer'], 'gold': gold_texts(record)}})\n"
-                "assert frozen_test['f1'] > baseline_null['f1']"
+                "# SWP-A: a quality comparison is a recorded verdict, not an assert, so a BYOD run still reaches adaptation and export.\n"
+                "frozen_vs_null = 'above' if frozen_test['f1'] > baseline_null['f1'] else 'not above'\n"
+                "print({{'verdict_frozen_vs_always_null_f1': frozen_vs_null}})"
+            ),
+        },
+        {
+            "md": (
+                '**What to notice:** the always-null and lexical-overlap rows, the frozen exact-match and F1, `answered_rate`, and the verdict line.\n\n<details><summary>Check '
+                'your reasoning</summary>Not by much. In the recorded run F1 was 0.25 for always-null, 8.58 for lexical overlap and 12.38 for the frozen model (exact '
+                'match 0.25 / 0 / 8), and the frozen model answered only 43.5 % of the questions — these were chosen because a RoBERTa reader failed them. '
+                'The second answer is the surprise: with the null answer disabled the same frozen model scored F1 25.28 / exact match 16.75 in the review\'s '
+                'CPU float32 run of the 2026-10-02 notebook — about double, with no training. Most of the frozen model\'s low score is abstaining, not '
+                'misreading; on the questions it did answer it already read reasonably well (`frozen_f1_on_answered_questions`).</details>'
             ),
         },
         {
@@ -296,8 +417,11 @@ TEMPLATE = {
                 "Epoch 0 records the frozen model's validation exact-match and F1; every epoch is scored on the "
                 "validation split, and the epoch with the highest validation F1 is kept.\n\n"
                 "Watch validation F1 roughly double in the first epoch and the answered rate jump to 100 % (about 3.5 "
-                "minutes per epoch on CPU, validation scoring included). The build record's counter-examples are in the "
-                "model card; the default is the smallest configuration that captured most of the gain."
+                "minutes per epoch on the local CPU build workstation, validation scoring included; Colab CPU is slower, a T4 GPU much faster). The build record's counter-examples are in the "
+                "model card; the default is the smallest configuration that captured most of the gain. Every call starts from the "
+                "pinned base (`started_from` in the printed result), so a re-run with other settings is a fresh experiment, not "
+                "continued training, and epoch 0 is always the frozen model.\n\n"
+                "**Predict before running:** will the answered rate stay near the frozen model's, or move?"
             ),
             "code": (
                 "EPOCHS = 2  # @param {{type:\"integer\"}}\n"
@@ -316,7 +440,14 @@ TEMPLATE = {
                 "t0 = time.perf_counter()\n"
                 "adapt_result = pipe.adapt(train_records, val_records, epochs=EPOCHS, lr=LEARNING_RATE, batch_size=BATCH_SIZE, trainable_encoder_layers=TRAINABLE_ENCODER_LAYERS, progress=report)\n"
                 "adapt_seconds = round(time.perf_counter() - t0, 1)\n"
-                "print({{'trainable_parameters': adapt_result['n_trainable'], 'total_parameters': adapt_result['n_total'], 'best_epoch': adapt_result['best_epoch'], 'selection': adapt_result['selection'], 'seconds': adapt_seconds}})"
+                "print({{'trainable_parameters': adapt_result['n_trainable'], 'total_parameters': adapt_result['n_total'], 'best_epoch': adapt_result['best_epoch'], 'selection': adapt_result['selection'], 'started_from': adapt_result['started_from'], 'seconds': adapt_seconds}})"
+            ),
+        },
+        {
+            "md": (
+                '**What to notice:** epoch 0 (`note: frozen model`), validation F1 and answered rate per epoch, `best_epoch`, and `started_from`.\n\n<details><summary>Check '
+                'your reasoning</summary>It moves: validation F1 roughly doubles in the first epoch and the answered rate jumps to 100 %. Much of the gain is the model '
+                'learning to stop abstaining on a corpus with no unanswerable questions — Section 8 compares it with the forced-span baseline to show how much — and that is also a cost.</details>'
             ),
         },
         {
@@ -324,24 +455,40 @@ TEMPLATE = {
                 "## 8. Held-out evaluation\n\n"
                 "The test split was never used for training or epoch selection, and none of its passages or articles "
                 "appears in the training or validation splits. The adapted model is scored exactly as the frozen model was "
-                "in Section 6, and the four numbers are put side by side. Look for an F1 gain of ten points or more and an "
-                "answered rate at or near 100 % — the cell asserts the adapted F1 is above the frozen F1 — and for the same "
+                "in Section 6, and the five numbers are put side by side. Read the gain in two parts. **Null suppression** is the "
+                "forced-span F1 minus the frozen F1: what the frozen model gains just by never abstaining, with no training. "
+                "**Better reading** is the adapted F1 minus the forced-span F1: what the fine-tuning added beyond that. On this "
+                "corpus, which has no unanswerable questions, expect most of the gain to be the first part. The cell refuses to run if "
+                "the pipeline holds the pinned base (Section 6 re-run after Section 7). Look for an answered rate at or near 100 % — the cell records whether the adapted F1 is above the frozen F1 as a **verdict** (`improved`, "
+                "`no change` or `worse`) in the report and `result.json` instead of asserting it — and for the same "
                 "three questions answered by the adapted model. Four hundred questions from one seeded split of one corpus "
                 "give no dispersion estimate; the deltas are sample-sanity evidence that the adaptation contract works, not "
                 "a benchmark, and a gain on adversarial Wikipedia questions says nothing about your documents until you "
                 "measure it there. Note what the adaptation also removes: the model now answers every question, so its "
                 "ability to say *no answer* on SQuAD 2.0-style unanswerable questions is traded away on this corpus, which "
-                "contains none."
+                "contains none.\n\n"
+                "*Evaluation practice.* **Predict before running:** if the adapted model answers every question, what happens on a set where some questions have no answer?"
             ),
             "code": (
+                "if pipe.adapter is None:  # RQA-M3: never score the pinned base as 'adapted'\n"
+                "    raise RuntimeError('The pipeline holds the pinned base, not an adapted model (Section 6 was re-run after Section 7 and put the base back): run Section 7, then this cell.')\n"
                 "adapted_test = pipe.evaluate(test_records, max_answer_tokens=ANSWER_MAX_TOKENS)\n"
                 "adapted_val = pipe.evaluate(val_records, max_answer_tokens=ANSWER_MAX_TOKENS)\n"
                 "comparison = {{\n"
-                "    'exact_match': {{'always_null': round(baseline_null['exact_match'], 2), 'lexical_overlap': round(baseline_lexical['exact_match'], 2), 'frozen': round(frozen_test['exact_match'], 2), 'adapted': round(adapted_test['exact_match'], 2)}},\n"
-                "    'f1': {{'always_null': round(baseline_null['f1'], 2), 'lexical_overlap': round(baseline_lexical['f1'], 2), 'frozen': round(frozen_test['f1'], 2), 'adapted': round(adapted_test['f1'], 2)}},\n"
-                "    'answered_rate': {{'frozen': round(frozen_test['answered_rate'], 1), 'adapted': round(adapted_test['answered_rate'], 1)}},\n"
+                "    'exact_match': {{'always_null': round(baseline_null['exact_match'], 2), 'lexical_overlap': round(baseline_lexical['exact_match'], 2), 'frozen': round(frozen_test['exact_match'], 2), 'frozen_forced_span': round(frozen_forced_test['exact_match'], 2), 'adapted': round(adapted_test['exact_match'], 2)}},\n"
+                "    'f1': {{'always_null': round(baseline_null['f1'], 2), 'lexical_overlap': round(baseline_lexical['f1'], 2), 'frozen': round(frozen_test['f1'], 2), 'frozen_forced_span': round(frozen_forced_test['f1'], 2), 'adapted': round(adapted_test['f1'], 2)}},\n"
+                "    'answered_rate': {{'frozen': round(frozen_test['answered_rate'], 1), 'frozen_forced_span': round(frozen_forced_test['answered_rate'], 1), 'adapted': round(adapted_test['answered_rate'], 1)}},\n"
                 "    'delta_vs_frozen': {{'exact_match': round(adapted_test['exact_match'] - frozen_test['exact_match'], 2), 'f1': round(adapted_test['f1'] - frozen_test['f1'], 2)}},\n"
+                "    # RQA-M2: the F1 change split into what disabling the null answer gives and what training adds beyond it.\n"
+                "    'f1_gain_parts': {{'null_suppression': round(frozen_forced_test['f1'] - frozen_test['f1'], 2), 'better_reading': round(adapted_test['f1'] - frozen_forced_test['f1'], 2)}},\n"
                 "}}\n"
+                "delta_f1 = adapted_test['f1'] - frozen_test['f1']\n"
+                "# SWP-A: the direction is a recorded verdict, not an assert, so a BYOD run always reaches export, reload and result.json.\n"
+                "comparison['verdict'] = {{'adapted_vs_frozen_f1': 'improved' if delta_f1 > 0 else ('no change' if delta_f1 == 0 else 'worse'), 'frozen_vs_always_null_f1': frozen_vs_null}}\n"
+                "reading_gain = adapted_test['f1'] - frozen_forced_test['f1']\n"
+                "comparison['verdict']['adapted_vs_frozen_forced_span_f1'] = 'more than 1 F1 above' if reading_gain > 1 else ('within 1 F1 (not distinguishable without a dispersion estimate)' if reading_gain >= -1 else 'more than 1 F1 below')\n"
+                "if comparison['verdict']['adapted_vs_frozen_f1'] != 'improved':\n"
+                "    print({{'warning': 'adaptation did not beat the frozen model on this data; the run continues to export so you can inspect it'}})\n"
                 "for metric, row in comparison.items():\n"
                 "    print({{metric: row}})\n"
                 "for record in test_records[:3]:\n"
@@ -356,24 +503,39 @@ TEMPLATE = {
                 "    'max_answer_tokens': ANSWER_MAX_TOKENS,\n"
                 "    'baselines': {{'always_null': baseline_null, 'lexical_overlap': baseline_lexical}},\n"
                 "    'frozen_test': frozen_test,\n"
+                "    'frozen_forced_span_test': frozen_forced_test,\n"
                 "    'validation_metrics': adapted_val,\n"
                 "    'test_metrics': adapted_test,\n"
                 "    'comparison': comparison,\n"
+                "    'verdict': comparison['verdict'],\n"
                 "    'adaptation': {{k: v for k, v in adapt_result.items() if k not in ('history', 'trainable_names')}},\n"
                 "    'history': adapt_result['history'],\n"
                 "    'adaptation_seconds': adapt_seconds,\n"
                 "}}\n"
                 "with open('outputs/{stem}_evaluation_report.json', 'w', encoding='utf-8') as f:\n"
                 "    json.dump(evaluation_report_payload, f, indent=2, ensure_ascii=False)\n"
-                "assert adapted_test['f1'] > frozen_test['f1']\n"
                 "print({{'report': 'outputs/{stem}_evaluation_report.json'}})"
             ),
         },
         {
             "md": (
+                '**What to notice:** the four columns of exact-match and F1, `answered_rate`, `delta_vs_frozen`, and the `verdict`.\n\n<details><summary>Check your '
+                'reasoning</summary>It would answer them anyway: the no-answer behaviour is traded away on this corpus. In the recorded Kaggle T4 run F1 rose 12.38 → 25.81 and '
+                'exact match 8 → 16.25 (verdict *improved*) while the answered rate went 43.5 % → 100 %. But the forced-span frozen model — no training at all — '
+                'scored F1 25.28 in the review\'s CPU run, so nearly all of that 13-point rise is **null suppression**: the model learned to stop abstaining. '
+                'The **better reading** part (`f1_gain_parts`) is about one F1 point or less, which one seeded split with no dispersion estimate cannot '
+                'distinguish from noise. So this run shows that the adaptation contract works end to end; it does not show that two epochs taught the model '
+                "to read adversarial questions better. Re-measure on unanswerable questions from your own domain before relying on the adapted model's "
+                'silence — it no longer has any.</details>'
+            ),
+        },
+        {
+            "md": (
                 "## 9. Answer new questions, export the adapter and reload it\n\n"
-                "Six questions from dev articles that were in none of the splits (they were filtered out of the sample by "
-                "the passage-length filter, so they are also a small look at longer passages) are answered by the adapted "
+                "Six questions on dev **passages** that none of the splits used (they were filtered out of the sample by the "
+                "passage-length filter, so they are also a small look at longer passages) are answered. Their passages are unseen, "
+                "but their **articles** also appear in the validation and test splits, so the topics are not new. With BYOD the six "
+                "are the first test records — already scored in Section 8, so a look at the answers, not new evidence. They are answered by the adapted "
                 "model through the same `answer` contract as Section 5 and scored with `pipe.evaluate`, which returns a "
                 "`measured-small-sample` verdict because six questions carry no dispersion estimate; the single-pair "
                 "`evaluation_report` helper is written for the first of them, as the inference-only tutorial did.\n\n"
@@ -389,19 +551,27 @@ TEMPLATE = {
             "code": (
                 "import csv\n"
                 "import shutil\n\n"
+                "if pipe.adapter is None:  # RQA-M3: the export must be the model Section 8 evaluated\n"
+                "    raise RuntimeError('The pipeline holds the pinned base, not an adapted model (Section 6 was re-run after Section 7): run Section 7 and Section 8, then this cell.')\n"
                 "if USE_BYOD:\n"
+                "    # RQA-m3: these are test records Section 8 already scored, labelled as such.\n"
                 "    new_records = [{{**r, 'id': f'new-{{i:02d}}'}} for i, r in enumerate(test_records[:6])]\n"
+                "    new_provenance = 'BYOD test records already scored in Section 8 (a look at the answers, not new evidence)'\n"
                 "else:\n"
                 "    used = {{r['context'].lower() for part in splits.values() for r in part}}\n"
                 "    candidates = [r for r in corpus['dev'] if r['context'].lower() not in used and r['answers'] and len(r['context']) <= MAX_CONTEXT_CHARS]\n"
                 "    new_records = pipe.check_fit([{{**r, 'id': f'new-{{i:02d}}'}} for i, r in enumerate(candidates[:12])])['fitting'][:6]\n"
+                "    split_titles = {{r.get('title', '') for part in splits.values() for r in part}}\n"
+                "    shared = sorted({{r.get('title', '') for r in new_records}} & split_titles)\n"
+                "    new_provenance = f'unused passages from dev articles; articles shared with the splits: {{shared or \"none\"}}'\n"
+                "print({{'new_questions_provenance': new_provenance}})\n"
                 "new_metrics = pipe.evaluate(new_records, max_answer_tokens=ANSWER_MAX_TOKENS)\n"
                 "new_results = []\n"
                 "for record in new_records:\n"
                 "    item = pipe.answer(record['question'], record['context'], max_answer_tokens=ANSWER_MAX_TOKENS)\n"
                 "    new_results.append({{'id': record['id'], 'question': record['question'], 'answer': item['answer'], 'gold': gold_texts(record), 'score': item['score'], 'no_answer_score': item['no_answer_score'], 'answerable': item['answerable'], 'question_tokens': item['question_tokens'], 'context_tokens': item['context_tokens']}})\n"
                 "    print({{k: new_results[-1][k] for k in ('id', 'question', 'answer', 'gold')}})\n"
-                "single_report = evaluation_report({{'answer': new_results[0]['answer']}}, new_results[0]['gold'], sample_kind='one unseen AdversarialQA pair' if not USE_BYOD else 'one BYOD test record')\n"
+                "single_report = evaluation_report({{'answer': new_results[0]['answer']}}, new_results[0]['gold'], sample_kind='one AdversarialQA pair on an unused passage' if not USE_BYOD else 'one BYOD test record already scored in Section 8')\n"
                 "print({{'new_questions': {{'n': new_metrics['n'], 'exact_match': round(new_metrics['exact_match'], 2), 'f1': round(new_metrics['f1'], 2), 'verdict': new_metrics['verdict']}}, 'single_pair_report_verdict': single_report['verdict']}})\n"
                 "with open('outputs/{stem}_answers.csv', 'w', encoding='utf-8', newline='') as handle:\n"
                 "    writer = csv.DictWriter(handle, fieldnames=['id', 'question', 'answer', 'gold', 'score', 'no_answer_score', 'answerable', 'question_tokens', 'context_tokens'])\n"
@@ -432,7 +602,9 @@ TEMPLATE = {
                 "    'corpus': {{'name': CORPUS_NAME, 'release': CORPUS_RELEASE, 'url': CORPUS_URL, 'sha256': CORPUS_SHA256, 'license': CORPUS_LICENSE, 'members': CORPUS_MEMBERS}},\n"
                 "    'inference_contract': {{'input_manifest': input_manifest, 'sanity_checks': checks, 'items': [{{k: r[k] for k in ('id', 'question', 'answer', 'start', 'end', 'score', 'no_answer_score', 'best_span_score', 'answerable', 'question_tokens', 'context_tokens', 'seconds')}} for r in results], 'golds': golds}},\n"
                 "    'comparison': comparison,\n"
+                "    'verdict': comparison['verdict'],\n"
                 "    'new_questions': new_metrics,\n"
+                "    'new_questions_provenance': new_provenance,\n"
                 "    'single_pair_report': single_report,\n"
                 "    'artifact': {{'dir': str(artifact_dir), 'sha256': artifact_manifest['files'][0]['sha256'], 'bytes': artifact_manifest['files'][0]['bytes'], 'tensors': len(artifact_manifest['tensors'])}},\n"
                 "    'reload_parity': parity,\n"
@@ -443,15 +615,26 @@ TEMPLATE = {
                 "print(sorted(os.listdir('outputs')))"
             ),
         },
+        {
+            "md": (
+                "**What to notice:** the new questions' answers against gold, the artifact's size, and `reload_parity`.\n\n<details><summary>Check your "
+                'reasoning</summary>Six questions are a small look, not a measurement (`measured-small-sample`). In the recorded run the reloaded adapter gave '
+                'identical answers on all eight parity questions (8 of 8): the adapter plus the pinned, re-verified base is the whole adapted model.</details>'
+            ),
+        },
     ],
     "closing": (
         "## Interpretation and limits\n\n"
         "The frozen model fails most adversarial questions — its test F1 sits near the lexical-overlap baseline and it "
         "returns the empty answer for more than half of the answerable questions — and a bounded fine-tuning of the last two "
         "encoder blocks and the span head on 1,000 in-distribution questions roughly doubles held-out F1 and lifts the "
-        "answered rate to 100 % in a few minutes on CPU, with a 57 MB adapter that reloads to identical answers. That is the "
-        "claim: the adaptation contract works end to end on a real gold-span corpus, and the numbers it produces are read "
-        "against two non-neural baselines and the frozen model rather than in isolation.\n\n"
+        "answered rate to 100 %, with a 57 MB adapter that reloads to identical answers. **Almost all of that F1 rise is null "
+        "suppression, not better reading:** the frozen model with the empty answer disabled — no training — scores within about "
+        "a point of the adapted model (Section 8's `f1_gain_parts`), and one seeded split with no dispersion estimate cannot "
+        "tell that last point from noise. On this corpus the fine-tune taught the model to stop abstaining. That is the claim: "
+        "the adaptation contract works end to end on a real gold-span corpus, and the numbers it produces are read against "
+        "two non-neural baselines, the frozen model and its forced-span reading rather than in isolation; it is not evidence "
+        "that the adapted model reads adversarial questions better.\n\n"
         "The test split is 400 questions over 16 articles from one seeded split of one corpus, the metrics are two "
         "reference-based scores (own implementations of the SQuAD 2.0 normalisation, and neither a human judgement), and "
         "AdversarialQA is Wikipedia prose with single-span gold answers and no unanswerable questions. So a gain here says "
@@ -473,10 +656,56 @@ TEMPLATE = {
         "shown machine-readable artifacts — without the repository being reachable. It does **not** establish benchmark "
         "superiority, reading-comprehension accuracy on any other domain, a usable no-answer threshold, or production "
         "fitness.\n\n"
-        "**Optional experiments (they do not affect the default path):** set `TRAINABLE_ENCODER_LAYERS = 1` and compare the "
-        "artifact size and the test scores; raise `EPOCHS` and watch the validation F1 pick the epoch; add unanswerable "
-        "records to a BYOD set (empty `answers`) and read the always-null baseline and the adapted `answered_rate` together; "
-        "or bring your own documents through BYOD and read the two baselines before the adapted number.\n\n"
+        "## Activity: does a smaller adapter still beat the forced-span baseline?\n\n"
+        "Run this only after the default Run all has finished; Section 9's exported files are replaced when you re-run Section 9.\n\n"
+        "1. **Predict.** Write down the held-out F1 you expect if only the **last one** encoder block and the span head train "
+        "(about half the trainable parameters). Above or below the forced-span frozen F1 from Section 6?\n"
+        "2. **Change.** In Section 7 set `TRAINABLE_ENCODER_LAYERS = 1`; leave every other field as it is.\n"
+        "3. **Run.** Run Sections 6, 7, 8 and 9, in that order. Section 6 puts the pinned base back and reprints the frozen numbers; "
+        "every adaptation starts from the pinned base (`started_from` in Section 7's output), so this is a fresh experiment, not "
+        "more training on top of the first run.\n"
+        "4. **Observe.** Section 6 must print the same frozen F1 as before, and Section 7's epoch 0 (`note: frozen model`) the same "
+        "validation F1 as in the default run — the same starting point. Then read `f1_gain_parts` in Section 8, the artifact size "
+        "in Section 9, and check that `reload_parity` still matches every answer.\n"
+        "5. **Explain.** Say in one sentence whether the smaller adapter changed the *better reading* part, and what that tells you "
+        "about where the gain on this corpus comes from.\n\n"
+        "To put the notebook back to the recorded state, set `TRAINABLE_ENCODER_LAYERS = 2` and run Sections 6, 7, 8 and 9 again.\n\n"
+        "<details><summary>Check your reasoning</summary>Expect the answered rate to reach 100 % again and F1 to land near the "
+        "forced-span frozen F1: stopping abstention needs little capacity, so one block and the span head are enough for it. The "
+        "*better reading* part stays within about a point either way. The exact figures depend on the device; what matters is "
+        "that the same starting point and the null-suppression share hold.</details>\n\n"
+        "**More experiments (same procedure: re-run from Section 6, or from Section 4 for BYOD; they do not affect the default path):** "
+        "raise `EPOCHS` and watch the validation F1 pick the epoch; add unanswerable records to a BYOD set (empty `answers`) and "
+        "read the always-null baseline and the adapted `answered_rate` together; or bring your own documents through BYOD and read "
+        "the baselines and the forced-span row before the adapted number.\n\n"
+        '## Troubleshooting\n\n- **Section 1 stops with "This notebook needs a Linux x86_64 runtime"** — you are on Windows, macOS or an ARM machine. Use Google '
+        'Colab, Kaggle or a Linux x86_64 Jupyter server.\n- **The uv wheel fails its size/SHA-256 check, or a download in Section 1 times out** — run Section 1 '
+        'again; a complete environment built from the same lock is reused, an incomplete one is finished. If it repeats, the network is blocking or altering '
+        '`files.pythonhosted.org` or `pypi.org`.\n- **"The isolated environment\'s Python process exited"** — usually out of memory. Restart the session and '
+        'choose **Run all**.\n- **You re-ran Section 1 on its own** — nothing is lost: it keeps the running worker and every variable, so the cells after it '
+        'keep working. After a session restart, run from the top.\n- **Section 3 reports a size or SHA-256 mismatch, or cannot reach the Hub** — the message '
+        'names the file. Delete it from the snapshot folder Section 3 prints and run Section 3 again.\n- **Section 4 reports a size or SHA-256 mismatch for the '
+        'AdversarialQA zip** — the download from `adversarialqa.github.io` was cut short or altered. Run Section 4 again.\n- **Section 5 drops records in the '
+        'fit check** — passages over 384 tokens are refused by `answer`, so they are dropped and listed rather than truncated. Long documents must be chunked '
+        'before they enter this pipeline.\n- **BYOD: a span-offset or field refusal** — each gold `text` must appear verbatim at its `answer_start`; the message '
+        'names the record and the rule.\n- **BYOD: "BYOD_PATH … is not a file"** — the path is relative to the working directory printed in the message; give '
+        'one .json, .jsonl or .csv file.\n- **BYOD: "the upload dialog exists only in Google Colab"** — on Kaggle or Jupyter, put the file in the runtime and '
+        'set `BYOD_PATH`.\n- **BYOD: "Upload exactly one file"** — the dialog was cancelled or several files were chosen; run the cell again.\n- **BYOD: "the dataset has N records; at least 12 are required" or "the split … leaves N training records"** — '
+        'the training split needs 8 records after 20 % go to test and 15 % to validation, and every question on one passage stays in one split; add records, '
+        'or spread them over more passages.\n- **Section 8 or 9 says the pipeline holds the pinned base** — you re-ran Section 6 after Section 7, and it put '
+        'the pretrained weights back so its numbers are the frozen model\'s. Run Section 7 again, then Sections 8 and 9.\n\n## Glossary\n\n- '
+        '**Extractive QA:** answering by selecting a span of the passage, not by generating text.\n- **Span head:** the layer that scores every token as a '
+        "possible answer start and end.\n- **No-answer (SQuAD 2.0):** the option to return `''` when the passage does not answer; scored at the `<s>` position.\n- "
+        '**Exact match / F1:** whether the normalised prediction equals a gold answer; the token-overlap F1 between them.\n- **Always-null / lexical-overlap '
+        'baselines:** answer nothing; answer with the passage sentence sharing the most words with the question.\n- **Forced-span baseline:** the frozen model with the empty answer disabled (`allow_null=False`): it always returns its best span, which shows how much of a score is abstaining rather than misreading.\n- **Answered rate:** the share of questions '
+        "for which a span, not `''`, was returned.\n- **Fit check:** the partition of records into those within the token ceilings and those `answer` would refuse.\n- "
+        '**Frozen / adapted / pinned base:** the packaged model; the model after Section 7; the verified packaged weights every adaptation starts from (`restore_base`).\n- '
+        '**Isolated environment:** the separate Python environment Section 1 builds from the hash lock; every later cell runs there.\n\n## Conclusion (your notes)\n\nComplete '
+        "these in your own words; the recorded run's values are in the **Check your reasoning** answers above.\n\n- The frozen model scored F1 ___ against the "
+        "lexical baseline's ___ and answered ___ of the questions; with the null answer disabled it scored ___.\n- Fine-tuning moved F1 to ___ (verdict: ___) and the answered rate to ___; "
+        "of that rise, ___ was null suppression and ___ better reading, and it costs ___.\n- "
+        'The number I would not trust on its own is ___, because ___.\n- Before using this on my own documents I would split by ___ and measure unanswerable '
+        'questions by ___.\n\n'
         "## References\n\n"
         "- Repository README: https://github.com/kurtvalcorza/roberta-squad2-question-answering-pipeline/blob/main/README.md\n"
         "- Repository model card: https://github.com/kurtvalcorza/roberta-squad2-question-answering-pipeline/blob/main/MODEL_CARD.md\n"
@@ -486,6 +715,6 @@ TEMPLATE = {
         "- RoBERTa: A Robustly Optimized BERT Pretraining Approach (Liu et al., 2019): https://arxiv.org/abs/1907.11692\n"
         "- Know What You Don't Know: Unanswerable Questions for SQuAD (Rajpurkar et al., ACL 2018): https://arxiv.org/abs/1806.03822\n"
         "- Beat the AI: Investigating Adversarial Human Annotation for Reading Comprehension (Bartolo et al., TACL 2020; AdversarialQA v1.0, CC BY-SA 3.0): https://arxiv.org/abs/2002.00293 — data: https://adversarialqa.github.io/\n"
-        "- DIMER Notebook Specification 2.0 and Model Card Specification 1.1 (fleet specs in the ml-worker repository)"
+        "- DIMER Notebook Specification 2.2 and Model Card Specification 1.1 (fleet specs in the ml-worker repository)"
     ),
 }

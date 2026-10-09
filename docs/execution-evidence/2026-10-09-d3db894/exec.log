@@ -1,0 +1,71 @@
+[colab] Parsing notebook '/home/kurt/colab-runs/roberta-squad2-question-answering-pipeline-d3db894-be4a96/roberta_question_answering_colab_d3db894_colab-cli-t4.ipynb'...
+[colab] Executing cell 1/12 - Infrastructure: build (or reuse) the isolated environment and route later cells to it...
+{'isolated_environment': '/content/dimer_isolated_env_43e637477971', 'reused': False, 'isolated_python': '3.12.12', 'kernel_python': '3.13.15', 'locked_packages': 47, 'setup_seconds': 120}
+{'routed_to': '/content/dimer_isolated_env_43e637477971/bin/python', 'worker_pid': 1623, 'worker_reused': False}
+[colab] Executing cell 2/12 - Infrastructure: record the runtime...
+{'notebook_source': {'repository': 'roberta-squad2-question-answering-pipeline', 'repository_revision': 'c190f2e5d711d35021392e68c48418651bc7a744', 'embedded_module': 'src/roberta_question_answering_pipeline/pipeline.py', 'embedded_modules': ['src/roberta_question_answering_pipeline/metrics.py', 'src/roberta_question_answering_pipeline/pipeline.py', 'src/roberta_question_answering_pipeline/samples.py'], 'module_sha256': '056ce2cad9648be50da197e70e7b25a1cdba371495e7ce8cdc429cd8e6942627', 'generator': 'build_notebook.py/2.2', 'notebook_spec': '2.2'}, 'python': '3.12.12', 'executable': '/content/dimer_isolated_env_43e637477971/bin/python', 'torch': '2.14.0+cu130', 'transformers': '4.57.6', 'cuda': True}
+[colab] Executing cell 3/12 - roberta_question_answering-08...
+[colab] Executing cell 4/12 - roberta_question_answering-10...
+[colab] Executing cell 5/12 - roberta_question_answering-12...
+[colab] Executing cell 6/12 - Infrastructure: stage and digest-verify the pinned snapshot, then load the model...
+{'model_id': 'deepset/roberta-base-squad2', 'revision': 'adc3b06f79f797d1c575d5479d6f5efe54a9e3b4', 'license': 'cc-by-4.0', 'files': 7, 'total_bytes': 497620185}
+{'weights_dir': '/content/weights/roberta-base-squad2', 'fetched': ['README.md', 'config.json', 'merges.txt', 'model.safetensors', 'special_tokens_map.json', 'tokenizer_config.json', 'vocab.json']}
+{'verified_files': 7, 'revision': 'adc3b06f79f797d1c575d5479d6f5efe54a9e3b4'}
+{'device': 'cuda:0', 'source': 'local-snapshot'}
+[colab] Executing cell 7/12 - roberta_question_answering-16...
+{'data_source': 'AdversarialQA v1.0 (2020-09-23) dRoBERTa subset (CC BY-SA 3.0 (Bartolo et al. 2020; adversarialqa.github.io))', 'raw_questions': {'train': 10000, 'dev': 1000}, 'splits': {'train': 1000, 'validation': 200, 'test': 400}, 'articles': {'train': 358, 'validation': 5, 'test': 16}, 'corpus_sha256': 'f4f3c23224a5060b...'}
+{'train': {'n': 1000, 'unique_contexts': 826, 'unanswerable': 0, 'context_chars': {'min': 152, 'max': 1295}, 'digest': '19021a6fe3a2d859...'}}
+{'validation': {'n': 200, 'unique_contexts': 78, 'unanswerable': 0, 'context_chars': {'min': 513, 'max': 1166}, 'digest': 'c2ba4720c44fb226...'}}
+{'test': {'n': 400, 'unique_contexts': 204, 'unanswerable': 0, 'context_chars': {'min': 158, 'max': 1291}, 'digest': '3598b03c785a80cc...'}}
+{'example': {'id': 'train-0000', 'question': 'what is the most current dated value of the purchase for Manhattan that is not listed in dollars', 'answers': [{'text': '60 guilders', 'answer_start': 647}], 'context': 'A permanent European presence in New Netherland began in 1624 – making New York the 12th oldest continuously occupied European-established settlement in the con...'}}
+{'probe': 'duplicate id', 'rejected': "duplicate id 'same'"}
+{'probe': 'missing field', 'rejected': "records[0] is missing 'answers'"}
+{'probe': 'too small', 'rejected': '3 records; 8..20000 are required'}
+{'probe': 'gold span at the wrong offset', 'rejected': "records[0]: answers[0] text '60 guilders' is not found at offset 648"}
+[colab] Executing cell 8/12 - roberta_question_answering-19...
+{'fit_check': {'train': {'fitting': 999, 'dropped': ['train-0362']}, 'validation': {'fitting': 200, 'dropped': []}, 'test': {'fitting': 400, 'dropped': []}}}
+{'MAX_QUESTION_CHARS': 500, 'MAX_CONTEXT_CHARS': 3000, 'MAX_QUESTION_TOKENS': 64, 'MAX_CONTEXT_TOKENS': 384, 'MAX_ANSWER_TOKENS': 64, 'DEFAULT_MAX_ANSWER_TOKENS': 15}
+{'decision_rule': 'softmax start and end logits over the context tokens plus <s>; no_answer_score = P_start(<s>) * P_end(<s>); best span = argmax P_start(i) * P_end(j) over i <= j < i + max_answer_tokens inside the context; the empty answer is returned when no_answer_score > best span score (upstream handle_impossible_answer=True rule); scores are products of softmax masses, not calibrated probabilities'}
+pair00 [answerable] score=0.9420 null=0.0000 best_span=0.9420 8+48 tokens: 'Gustave Eiffel' [119:133]
+pair01 [answerable] score=0.6650 null=0.0000 best_span=0.6650 6+48 tokens: '1887 to 1889' [183:195]
+pair02 [no answer] score=0.8760 null=0.8760 best_span=0.0001 7+48 tokens: '' [0:0]
+{'checks': {'one_result_per_pair': True, 'span_is_substring_at_offsets': True, 'question_within_ceiling': True, 'context_within_ceiling': True, 'scores_in_unit_interval': True, 'null_rule_consistent': True, 'setting_echoed': True}, 'unanswered': ['pair02'], 'findings': 1}
+[colab] Executing cell 9/12 - roberta_question_answering-22...
+{'always_null_baseline': {'exact_match': 0.25, 'f1': 0.25, 'n': 400}}
+{'lexical_overlap_baseline': {'exact_match': 0.0, 'f1': 8.58, 'n': 400}}
+{'frozen_model_test': {'exact_match': 8.0, 'f1': 12.38, 'answered_rate': 43.5, 'n': 400, 'verdict': 'measured'}, 'seconds': 5.1}
+{'frozen_forced_span_test': {'exact_match': 16.75, 'f1': 25.28, 'answered_rate': 100.0, 'n': 400}, 'frozen_f1_on_answered_questions': 27.89}
+{'definitions': {'exact_match': 'mean over questions of 1[normalised prediction equals any normalised gold]; SQuAD normalisation (lower-case, strip punctuation and a/an/the, collapse spaces); an unanswerable gold matches only the empty prediction; reported in percent', 'f1': 'mean over questions of the best token-overlap F1 against any gold (1.0 for an empty prediction on an unanswerable gold, else 0.0 when either side is empty); reported in percent'}}
+{'question': 'Limitations of what attribute would cause two smaller cylinders to be used in place of one standard size one during the low pressure stage?', 'frozen': 'space is at a premium', 'gold': ['space']}
+{'question': 'what is the first city mentioned?', 'frozen': 'Warsaw', 'gold': ['Warsaw']}
+{'question': 'what is the second city mentioned?', 'frozen': '', 'gold': ['Ponteland']}
+{'verdict_frozen_vs_always_null_f1': 'above'}
+[colab] Executing cell 10/12 - roberta_question_answering-25...
+{'epoch': 0, 'train_loss': None, 'val_exact_match': 8.5, 'val_f1': 14.14, 'val_answered_rate': 43.5, 'note': 'frozen model'}
+{'epoch': 1, 'train_loss': 3.2556, 'val_exact_match': 23.0, 'val_f1': 32.39, 'val_answered_rate': 100.0}
+{'epoch': 2, 'train_loss': 2.9811, 'val_exact_match': 22.0, 'val_f1': 32.39, 'val_answered_rate': 100.0}
+{'trainable_parameters': 14177282, 'total_parameters': 124056578, 'best_epoch': 2, 'selection': 'highest validation F1', 'started_from': 'pinned base', 'seconds': 46.7}
+[colab] Executing cell 11/12 - roberta_question_answering-28...
+{'exact_match': {'always_null': 0.25, 'lexical_overlap': 0.0, 'frozen': 8.0, 'frozen_forced_span': 16.75, 'adapted': 16.25}}
+{'f1': {'always_null': 0.25, 'lexical_overlap': 8.58, 'frozen': 12.38, 'frozen_forced_span': 25.28, 'adapted': 25.81}}
+{'answered_rate': {'frozen': 43.5, 'frozen_forced_span': 100.0, 'adapted': 100.0}}
+{'delta_vs_frozen': {'exact_match': 8.25, 'f1': 13.43}}
+{'f1_gain_parts': {'null_suppression': 12.89, 'better_reading': 0.53}}
+{'verdict': {'adapted_vs_frozen_f1': 'improved', 'frozen_vs_always_null_f1': 'above', 'adapted_vs_frozen_forced_span_f1': 'within 1 F1 (not distinguishable without a dispersion estimate)'}}
+{'question': 'Limitations of what attribute would cause two smaller cylinders to be used in place of one standard size one during the low pressure stage?', 'adapted': 'space is at a premium', 'gold': ['space']}
+{'question': 'what is the first city mentioned?', 'adapted': 'Warsaw', 'gold': ['Warsaw']}
+{'question': 'what is the second city mentioned?', 'adapted': 'Ponteland', 'gold': ['Ponteland']}
+{'report': 'outputs/roberta_question_answering_evaluation_report.json'}
+[colab] Executing cell 12/12 - roberta_question_answering-31...
+{'new_questions_provenance': "unused passages from dev articles; articles shared with the splits: ['United_Methodist_Church']"}
+{'id': 'new-00', 'question': 'How do the diverse clergy and laity within the UMC take meaning from the Bible?', 'answer': 'differing viewpoints', 'gold': ['using sacred tradition, reason, and experience']}
+{'id': 'new-01', 'question': 'What refers to the parishioners at the UMC?', 'answer': 'clergy and laity', 'gold': ['laity']}
+{'id': 'new-02', 'question': 'Who would ultimately decide what individual UMC churches believe and practice in regards to things such as ideology and gender-related tolerance?', 'answer': 'moderate and tolerant denominations', 'gold': ['clergy and laity']}
+{'id': 'new-03', 'question': 'Who may be more likely to have female clergy?', 'answer': 'the UMC', 'gold': ['United Church of Christ and the Episcopal Church']}
+{'id': 'new-04', 'question': 'Who may be more likely to have homosexual clergy?', 'answer': 'United Church of Christ and the Episcopal Church', 'gold': ['United Church of Christ and the Episcopal Church']}
+{'id': 'new-05', 'question': 'In general, Methodist churches are more liberal than evangelical churches when it comes to what issues?', 'answer': 'sexuality', 'gold': ['social justice and Biblical interpretation']}
+{'new_questions': {'n': 6, 'exact_match': 16.67, 'f1': 29.76, 'verdict': 'measured-small-sample'}, 'single_pair_report_verdict': 'sample-sanity'}
+{'artifact': 'outputs/roberta_question_answering_adapter', 'format': 'org.valcorza.roberta-base-squad2.adapter.v1', 'tensors': 34, 'bytes': 56713104, 'sha256': '4b13df820054100e...'}
+{'reload_parity': {'identical_answers': 8, 'of': 8}, 'reloaded_best_epoch': 2}
+['roberta_question_answering_adapter', 'roberta_question_answering_answers.csv', 'roberta_question_answering_evaluation_report.json', 'roberta_question_answering_input_manifest.json', 'roberta_question_answering_result.json', 'roberta_question_answering_train.csv']
+[colab] Saving notebook with outputs to '/home/kurt/colab-runs/roberta-squad2-question-answering-pipeline-d3db894-be4a96/roberta_question_answering_colab_d3db894_colab-cli-t4_output.ipynb'...

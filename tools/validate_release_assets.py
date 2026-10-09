@@ -1,6 +1,6 @@
 """Static release-asset validation for the RoBERTa-base SQuAD2 question-answering DIMER pipeline.
 
-Checks the STANDALONE tutorial notebook (DIMER Notebook Specification 2.0 §4), the tutorial
+Checks the STANDALONE tutorial notebook (DIMER Notebook Specification 2.2 §4), the tutorial
 registry, model card, README, STATUS.md and weight documentation for source conformance and
 cross-document identity consistency, and runs the generator parity checks (PAR1–PAR3).
 
@@ -45,7 +45,8 @@ CODE_MARKERS = (
     "corpus = read_corpus(fetch_corpus(cache_dir='weights/adversarialqa'))",
     "splits = build_sample_dataset(corpus, seed=SPLIT_SEED)",
     "records = load_byod_dataset(byod_path)",
-    "dataset_manifests = {name: validate_dataset(part) for name, part in splits.items()}",
+    "dataset_manifests = {name: validate_dataset(part) if name == 'train' else validate_dataset(part, min_records=1) for name, part in splits.items()}",
+    "probe_record = next((r for r in splits['train'] if r['answers']), None)",
     "disjoint = check_split_disjoint(splits)",
     "write_dataset_csv(splits['train'], 'outputs/roberta_question_answering_train.csv')",
     # Stage 5: fit check, ceilings, the inference contract with its manifest, probe and sanity checks
@@ -63,6 +64,8 @@ CODE_MARKERS = (
     "baseline_lexical = lexical_overlap_baseline(test_records)",
     "frozen_test = pipe.evaluate(test_records, max_answer_tokens=ANSWER_MAX_TOKENS)",
     "frozen_vs_null = 'above' if frozen_test['f1'] > baseline_null['f1'] else 'not above'",
+    "frozen_forced_test = pipe.evaluate(test_records, max_answer_tokens=ANSWER_MAX_TOKENS, allow_null=False)",
+    "if pipe.restore_base():",
     # Stage 7: bounded fine-tuning with explicit hyperparameters
     "adapt_result = pipe.adapt(",
     "trainable_encoder_layers=TRAINABLE_ENCODER_LAYERS",
@@ -71,6 +74,8 @@ CODE_MARKERS = (
     "adapted_test = pipe.evaluate(test_records, max_answer_tokens=ANSWER_MAX_TOKENS)",
     "adapted_val = pipe.evaluate(val_records, max_answer_tokens=ANSWER_MAX_TOKENS)",
     "'delta_vs_frozen'",
+    "'f1_gain_parts'",
+    "if pipe.adapter is None:",
     "comparison['verdict'] = {'adapted_vs_frozen_f1': 'improved' if delta_f1 > 0 else ('no change' if delta_f1 == 0 else 'worse'), 'frozen_vs_always_null_f1': frozen_vs_null}",
     "'verdict': comparison['verdict']",
     # Stage 9: new questions, single-pair report, artifact, reload parity, provenance
@@ -133,10 +138,10 @@ INSTALL_CELL_MARKER = "# dimer: kernel cell"
 # ---------------------------------------------------------------------------
 # Shared checks. Everything below is source/structure validation only. Passing
 # these checks is NOT clean-runtime execution evidence under DIMER Notebook
-# Specification 2.0; see docs/release-verification.md for the release gate.
+# Specification 2.2; see docs/release-verification.md for the release gate.
 # ---------------------------------------------------------------------------
 
-NOTEBOOK_SPEC = "2.0"
+NOTEBOOK_SPEC = "2.2"
 ALLOWED_PROFILES = {"E2E", "ARTIFACT-INFERENCE", "TASK-INFERENCE", "MULTI-CAPABILITY", "SMOKE"}
 STATUS_TOKENS = ("Candidate", "Release-grade")
 PLACEHOLDER = re.compile(r"\b(TODO|TBD|FIXME)\b|Insert text here|Tooltip:", re.I)

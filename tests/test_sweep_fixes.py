@@ -92,7 +92,10 @@ def test_swp_r_section_1_is_idempotent_and_keeps_the_live_worker(notebook, tmp_p
     lock_sha = re.search(r"^LOCK_SHA256 = '([0-9a-f]{64})'$", source, re.M).group(1)
     env = tmp_path / "env"
     (env / "bin").mkdir(parents=True)
-    (env / "bin" / "python").symlink_to(sys.executable)
+    try:
+        (env / "bin" / "python").symlink_to(sys.executable)
+    except OSError as exc:  # Windows without the symlink privilege (WinError 1314); the cell targets Linux runtimes
+        pytest.skip(f"cannot create a symlink here: {exc}")
     (env / ".dimer-lock-sha256").write_text(lock_sha + "\n", encoding="utf-8")
     monkeypatch.setenv("DIMER_ISOLATED_ENV", str(env))
     monkeypatch.delenv("DIMER_NOTEBOOK_CI_PREINSTALLED", raising=False)
@@ -174,10 +177,10 @@ def test_swp_a_section_8_records_the_verdict_and_writes_the_report(notebook, tmp
     source = _cell(notebook, "delta_f1 = ")
     monkeypatch.chdir(tmp_path)
     (tmp_path / "outputs").mkdir()
-    pipe = types.SimpleNamespace(evaluate=lambda records, **kw: _m(adapted_f1), answer=lambda q, c, **kw: {"answer": "x"})
+    pipe = types.SimpleNamespace(evaluate=lambda records, **kw: _m(adapted_f1), answer=lambda q, c, **kw: {"answer": "x"}, adapter={"best_epoch": 1})
     namespace = {
         "json": json, "pipe": pipe, "test_records": [], "val_records": [], "ANSWER_MAX_TOKENS": 30, "gold_texts": lambda r: [],
-        "baseline_null": _m(0.25), "baseline_lexical": _m(8.58), "frozen_test": _m(12.38), "frozen_vs_null": "above",
+        "baseline_null": _m(0.25), "baseline_lexical": _m(8.58), "frozen_test": _m(12.38), "frozen_forced_test": _m(25.28), "frozen_vs_null": "above",
         "MODEL_ID": "m", "MODEL_REVISION": "r", "MODEL_KEY": "k", "data_source": "stand-in", "dataset_manifests": {}, "disjoint": {},
         "fit": {}, "adapt_result": {"history": [], "best_epoch": 0}, "adapt_seconds": 0.0,
     }

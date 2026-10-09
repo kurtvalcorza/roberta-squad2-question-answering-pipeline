@@ -15,6 +15,7 @@ from .pipeline import (
     DEFAULT_TRAINABLE_ENCODER_LAYERS,
     DEFAULT_WEIGHTS_DIR,
     ENCODER_LAYERS,
+    FORCED_SPAN_RULE,
     INPUT_SCHEMA,
     MAX_ANSWER_TOKENS,
     MAX_CONTEXT_CHARS,
@@ -57,6 +58,7 @@ from .samples import (
     flatten_squad,
     gold_texts,
     load_byod_dataset,
+    min_split_records,
     read_corpus,
     split_dataset,
     validate_dataset,
@@ -64,6 +66,7 @@ from .samples import (
 )
 
 __all__ = [
+    "FORCED_SPAN_RULE",
     "ARTIFACT_FORMAT",
     "CORPUS_BYTES",
     "CORPUS_LICENSE",
@@ -112,6 +115,7 @@ __all__ = [
     "lexical_overlap_answer",
     "lexical_overlap_baseline",
     "load_byod_dataset",
+    "min_split_records",
     "normalize_answer",
     "null_baseline",
     "qa_metrics",

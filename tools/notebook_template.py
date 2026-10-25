@@ -49,7 +49,7 @@ TEMPLATE = {
         "no credential, no upload dialog and no configuration edit (NOTEBOOK_SPEC 2.2 §5). On the local CPU build workstation "
         "(Windows, Intel Core Ultra 9 275HX, float32) the model stages took about six minutes after the downloads; Colab's CPU "
         "runtime is unmeasured and likely several times slower (an estimate). A CUDA runtime is used automatically when "
-        "present: the hosted Kaggle Tesla T4 run of 19 September 2026 took 306 s for the whole notebook."
+        "present: the Colab T4 run of blob `35bae728` (commit `d3db894`, 9 October 2026) took 228.6 s for the whole notebook."
     ),
     "byod": (
         "After the tutorial workflow completes, set `USE_BYOD = True` in Section 4 and re-run from that cell to supply your own "
@@ -78,8 +78,8 @@ TEMPLATE = {
             "installs nothing into the notebook's own Python, so no restart is needed. Sections 1–3 are **infrastructure** — the isolated environment, the carried "
             'package and the model snapshot — and their cells are collapsed; you may run them without studying them. The learning path starts in Section 4. Form '
             'fields (`# @param`) are the only values meant to be edited, and the defaults reproduce the recorded run. Before each principal result the notebook '
-            'asks you to **Predict**; after it come **What to notice** and a collapsible **Check your reasoning** with a worked answer from the recorded run (the '
-            'Kaggle Tesla T4 run of 19 September 2026 recorded in `docs/release-verification.md`). Every adaptation starts from the pinned base, so re-running '
+            'asks you to **Predict**; after it come **What to notice** and a collapsible **Check your reasoning** with a worked answer quoted from a recorded run, '
+            'not re-run here: **the recorded run** is the Colab T4 run of blob `35bae728` (commit `d3db894`, 9 October 2026), recorded in `docs/release-verification.md`. Every adaptation starts from the pinned base, so re-running '
             'Section 7 with other settings is a fresh experiment. **Troubleshooting**, a **Glossary** and a **Conclusion** template are at the end. Writing your '
             'predictions down is optional.\n\n**Roadmap:** 1–3 infrastructure → 4 the AdversarialQA corpus, validation and the split *(evaluation practice)* → 5 the '
             'fit check and the inference contract *(core concept: spans, no-answer, scores)* → 6 baselines and the frozen model *(evaluation practice)* → 7 bounded '
@@ -130,8 +130,14 @@ TEMPLATE = {
         "hard: AdversarialQA v1.0 (Bartolo et al., TACL 2020, CC BY-SA 3.0) — SQuAD-style questions over Wikipedia "
         "passages written by annotators who could see a reader's predictions and kept only the questions it got wrong. "
         "The `dRoBERTa` subset was collected against a RoBERTa reader, so the frozen `roberta-base-squad2` scores far "
-        "below its SQuAD 2.0 dev figures here (the build record measured F1 12.4 on the test split, with the null "
-        "answer returned for more than half of the answerable questions), and the fine-tuning question is whether a "
+        "below its SQuAD 2.0 dev figures here (the recorded run measured F1 12.38 on the test split, with the null "
+        "answer returned for more than half of the answerable questions). **What the checkpoint may already have seen "
+        "(DAT9):** AdversarialQA's passages are SQuAD 1.1 Wikipedia paragraphs [3], and this checkpoint was fine-tuned on "
+        "SQuAD 2.0 [2], whose training set contains the SQuAD 1.1 training paragraphs; its RoBERTa base was pretrained on "
+        "text including English Wikipedia [1]. So the test **passages** (not the adversarial questions) may have been read "
+        "by the checkpoint during fine-tuning and very likely during pretraining. This is inferred from the dataset and "
+        "model descriptions; the 400 test passages were not matched against SQuAD 2.0 train. And the fine-tuning question "
+        "is whether a "
         "small in-distribution adaptation of the last two encoder blocks and the span head recovers ground on held-out "
         "articles. This corpus has **no unanswerable questions**, so part of any gain can come from the model simply ceasing to "
         "abstain; the frozen model is therefore also scored with the empty answer disabled — the **forced-span baseline** — "
@@ -165,7 +171,7 @@ TEMPLATE = {
         "repository exposes none of these."
     ),
     "prerequisites": [
-        "- **Runtime:** a fresh supported runtime (Google Colab or Jupyter, Python 3.12). The default path runs on CPU (float32) and uses CUDA automatically when available. CPU is adequate but not fast: the local build workstation (Windows, Intel Core Ultra 9 275HX, float32 — not a hosted runtime) measured 6 s to load and digest-verify the 498 MB snapshot, 20 s to answer the 400-question test split, and about 3.5 minutes per epoch of fine-tuning the last two encoder blocks and the span head on 1,000 questions (validation scoring included); Colab's CPU runtime is unmeasured and likely several times slower (an estimate). On the hosted Kaggle Tesla T4 run of 19 September 2026 the whole notebook took 306 s. Building the isolated environment (the pinned `torch==2.14.0` among its packages; reused on a re-run) and the 496 MB checkpoint are the large downloads of the run.",
+        "- **Runtime:** a fresh supported runtime (Google Colab or Jupyter, Python 3.12). The default path runs on CPU (float32) and uses CUDA automatically when available. CPU is adequate but not fast: the local build workstation (Windows, Intel Core Ultra 9 275HX, float32 — not a hosted runtime) measured 6 s to load and digest-verify the 498 MB snapshot, 20 s to answer the 400-question test split, and about 3.5 minutes per epoch of fine-tuning the last two encoder blocks and the span head on 1,000 questions (validation scoring included); Colab's CPU runtime is unmeasured and likely several times slower (an estimate). In the Colab T4 run of blob `35bae728` (commit `d3db894`, 9 October 2026) the whole notebook took 228.6 s (an earlier blob's Kaggle T4 run of 19 September 2026 took 306 s; neither is re-run here). Building the isolated environment (the pinned `torch==2.14.0` among its packages; reused on a re-run) and the 496 MB checkpoint are the large downloads of the run.",
         "- **Knowledge:** basic Python; what an encoder-only Transformer is; what span extraction means; why a reader can return a fluent-looking wrong span, or an empty answer for a question the passage does answer; what exact-match and F1 measure and why neither is a human judgement.",
         "- **Data contract:** records are `{id, question, context, answers}` — a question, its passage and a list of `{text, answer_start}` gold spans (empty for unanswerable), each `text` found verbatim at its offset; questions at most `MAX_QUESTION_CHARS` (500) characters and `MAX_QUESTION_TOKENS` (64) BPE tokens, passages at most `MAX_CONTEXT_CHARS` (3,000) characters and `MAX_CONTEXT_TOKENS` (384) tokens, enforced by rejecting, never by truncating or windowing; ids matching `[A-Za-z0-9_.:-]{1,64}` and unique; a training split needs 8..20,000 records, so a BYOD dataset needs **at least 12 records** with one question per passage (8 stay for training after the 20 % test and 15 % validation splits) and more when several questions share a passage, because they stay together; validation and test need at least one record each; every question on the same passage lands in the same split so a test passage is never trained on. BYOD accepts a JSON array, SQuAD-format JSON, JSONL or CSV in that shape.",
         "- **Validation is structural, not semantic:** nothing checks that a question is answerable from its passage beyond the gold text being present at its offset, or that a gold span is the *best* answer — a mislabelled corpus is fine-tuned on without complaint.",
@@ -283,7 +289,7 @@ TEMPLATE = {
                 "window) need the real tokenizer, so they are applied now that the model is loaded: `pipe.check_fit` "
                 "partitions each split into the records `answer` accepts and the ones it would **refuse with a "
                 "`ValueError` naming the count, never silently truncate or window**. The dropped ids are printed and the "
-                "fitting records are what every later cell uses (the build record dropped 1 of 1,600 sample records — a "
+                "fitting records are what every later cell uses (the recorded run dropped 1 of 1,600 sample records — a "
                 "1,295-character passage that tokenises to 460 pieces).\n\n"
                 "Then the inference contract is exercised as it always was on three authored questions over one "
                 "two-sentence passage — two answerable, one deliberately unanswerable. `validate_inputs` applies exactly "
@@ -401,8 +407,8 @@ TEMPLATE = {
                 '**What to notice:** the always-null and lexical-overlap rows, the frozen exact-match and F1, `answered_rate`, and the verdict line.\n\n<details><summary>Check '
                 'your reasoning</summary>Not by much. In the recorded run F1 was 0.25 for always-null, 8.58 for lexical overlap and 12.38 for the frozen model (exact '
                 'match 0.25 / 0 / 8), and the frozen model answered only 43.5 % of the questions — these were chosen because a RoBERTa reader failed them. '
-                'The second answer is the surprise: with the null answer disabled the same frozen model scored F1 25.28 / exact match 16.75 in the review\'s '
-                'CPU float32 run of the 2026-10-02 notebook — about double, with no training. Most of the frozen model\'s low score is abstaining, not '
+                'The second answer is the surprise: with the null answer disabled the same frozen model scored F1 25.28 / exact match 16.75 in the recorded run '
+                '(the review\'s CPU float32 run of the 2026-10-02 notebook printed the same) — about double, with no training. Most of the frozen model\'s low score is abstaining, not '
                 'misreading; on the questions it did answer it already read reasonably well (`frozen_f1_on_answered_questions`).</details>'
             ),
         },
@@ -417,8 +423,9 @@ TEMPLATE = {
                 "Epoch 0 records the frozen model's validation exact-match and F1; every epoch is scored on the "
                 "validation split, and the epoch with the highest validation F1 is kept.\n\n"
                 "Watch validation F1 roughly double in the first epoch and the answered rate jump to 100 % (about 3.5 "
-                "minutes per epoch on the local CPU build workstation, validation scoring included; Colab CPU is slower, a T4 GPU much faster). The build record's counter-examples are in the "
-                "model card; the default is the smallest configuration that captured most of the gain. Every call starts from the "
+                "minutes per epoch on the local CPU build workstation, validation scoring included; Colab CPU is slower, a T4 GPU much faster). The default configuration was chosen during "
+                "development; which configurations were tried, and on which split their gain was measured, is not recorded in "
+                "this repository, so if the choice used test F1 the Section 8 test numbers are optimistic. Every call starts from the "
                 "pinned base (`started_from` in the printed result), so a re-run with other settings is a fresh experiment, not "
                 "continued training, and epoch 0 is always the frozen model.\n\n"
                 "**Predict before running:** will the answered rate stay near the frozen model's, or move?"
@@ -453,8 +460,9 @@ TEMPLATE = {
         {
             "md": (
                 "## 8. Held-out evaluation\n\n"
-                "The test split was never used for training or epoch selection, and none of its passages or articles "
-                "appears in the training or validation splits. The adapted model is scored exactly as the frozen model was "
+                "The test split was never used for training or epoch selection in this notebook (whether it informed the "
+                "development choice of the default configuration is not recorded; Section 7), and none of its passages or "
+                "articles appears in the training or validation splits. The adapted model is scored exactly as the frozen model was "
                 "in Section 6, and the five numbers are put side by side. Read the gain in two parts. **Null suppression** is the "
                 "forced-span F1 minus the frozen F1: what the frozen model gains just by never abstaining, with no training. "
                 "**Better reading** is the adapted F1 minus the forced-span F1: what the fine-tuning added beyond that. On this "
@@ -520,9 +528,9 @@ TEMPLATE = {
         {
             "md": (
                 '**What to notice:** the four columns of exact-match and F1, `answered_rate`, `delta_vs_frozen`, and the `verdict`.\n\n<details><summary>Check your '
-                'reasoning</summary>It would answer them anyway: the no-answer behaviour is traded away on this corpus. In the recorded Kaggle T4 run F1 rose 12.38 → 25.81 and '
+                'reasoning</summary>It would answer them anyway: the no-answer behaviour is traded away on this corpus. In the recorded run F1 rose 12.38 → 25.81 and '
                 'exact match 8 → 16.25 (verdict *improved*) while the answered rate went 43.5 % → 100 %. But the forced-span frozen model — no training at all — '
-                'scored F1 25.28 in the review\'s CPU run, so nearly all of that 13-point rise is **null suppression**: the model learned to stop abstaining. '
+                'scored F1 25.28 in the same run, so nearly all of that 13-point rise is **null suppression**: the model learned to stop abstaining. '
                 'The **better reading** part (`f1_gain_parts`) is about one F1 point or less, which one seeded split with no dispersion estimate cannot '
                 'distinguish from noise. So this run shows that the adaptation contract works end to end; it does not show that two epochs taught the model '
                 "to read adversarial questions better. Re-measure on unanswerable questions from your own domain before relying on the adapted model's "
@@ -533,8 +541,9 @@ TEMPLATE = {
             "md": (
                 "## 9. Answer new questions, export the adapter and reload it\n\n"
                 "Six questions on dev **passages** that none of the splits used (they were filtered out of the sample by the "
-                "passage-length filter, so they are also a small look at longer passages) are answered. Their passages are unseen, "
-                "but their **articles** also appear in the validation and test splits, so the topics are not new. With BYOD the six "
+                "passage-length filter, so they are also a small look at longer passages) are answered. Their passages are unused by the "
+                "splits, not unseen by the checkpoint (see **What the checkpoint may already have seen** in the introduction), "
+                "and their **articles** also appear in the validation and test splits, so the topics are not new. With BYOD the six "
                 "are the first test records — already scored in Section 8, so a look at the answers, not new evidence. They are answered by the adapted "
                 "model through the same `answer` contract as Section 5 and scored with `pipe.evaluate`, which returns a "
                 "`measured-small-sample` verdict because six questions carry no dispersion estimate; the single-pair "
@@ -707,14 +716,14 @@ TEMPLATE = {
         'The number I would not trust on its own is ___, because ___.\n- Before using this on my own documents I would split by ___ and measure unanswerable '
         'questions by ___.\n\n'
         "## References\n\n"
-        "- Repository README: https://github.com/kurtvalcorza/roberta-squad2-question-answering-pipeline/blob/main/README.md\n"
-        "- Repository model card: https://github.com/kurtvalcorza/roberta-squad2-question-answering-pipeline/blob/main/MODEL_CARD.md\n"
-        "- Weight provenance and CC-BY-4.0 attribution: https://github.com/kurtvalcorza/roberta-squad2-question-answering-pipeline/blob/main/docs/WEIGHTS.md\n"
-        "- Upstream model (deepset, CC-BY-4.0): https://huggingface.co/{MODEL_ID}\n"
-        "- Upstream code: https://github.com/deepset-ai/haystack\n"
-        "- RoBERTa: A Robustly Optimized BERT Pretraining Approach (Liu et al., 2019): https://arxiv.org/abs/1907.11692\n"
-        "- Know What You Don't Know: Unanswerable Questions for SQuAD (Rajpurkar et al., ACL 2018): https://arxiv.org/abs/1806.03822\n"
-        "- Beat the AI: Investigating Adversarial Human Annotation for Reading Comprehension (Bartolo et al., TACL 2020; AdversarialQA v1.0, CC BY-SA 3.0): https://arxiv.org/abs/2002.00293 — data: https://adversarialqa.github.io/\n"
-        "- DIMER Notebook Specification 2.2 and Model Card Specification 1.1 (fleet specs in the ml-worker repository)"
+        "References follow the IEEE style.\n\n"
+        "[1] Y. Liu *et al.*, \"RoBERTa: A robustly optimized BERT pretraining approach,\" arXiv:1907.11692, 2019. [Online]. Available: https://arxiv.org/abs/1907.11692\n\n"
+        "[2] P. Rajpurkar, R. Jia, and P. Liang, \"Know what you don't know: Unanswerable questions for SQuAD,\" in *Proc. 56th Annu. Meet. Assoc. Comput. Linguist. (ACL)*, 2018, pp. 784–789. [Online]. Available: https://arxiv.org/abs/1806.03822\n\n"
+        "[3] M. Bartolo, A. Roberts, J. Welbl, S. Riedel, and P. Stenetorp, \"Beat the AI: Investigating adversarial human annotation for reading comprehension,\" *Trans. Assoc. Comput. Linguist.*, vol. 8, pp. 662–678, 2020 (AdversarialQA v1.0, CC BY-SA 3.0). [Online]. Available: https://arxiv.org/abs/2002.00293 — data: https://adversarialqa.github.io/\n\n"
+        "[4] deepset, \"{MODEL_ID},\" Hugging Face model card (CC-BY-4.0); upstream code https://github.com/deepset-ai/haystack. [Online]. Available: https://huggingface.co/{MODEL_ID}\n\n"
+        "[5] K. Valcorza, \"roberta-squad2-question-answering-pipeline: README,\" GitHub. [Online]. Available: https://github.com/kurtvalcorza/roberta-squad2-question-answering-pipeline/blob/main/README.md\n\n"
+        "[6] K. Valcorza, \"roberta-squad2-question-answering-pipeline: model card,\" GitHub. [Online]. Available: https://github.com/kurtvalcorza/roberta-squad2-question-answering-pipeline/blob/main/MODEL_CARD.md\n\n"
+        "[7] K. Valcorza, \"roberta-squad2-question-answering-pipeline: weight provenance and CC-BY-4.0 attribution,\" GitHub. [Online]. Available: https://github.com/kurtvalcorza/roberta-squad2-question-answering-pipeline/blob/main/docs/WEIGHTS.md\n\n"
+        "[8] DIMER, \"DIMER Notebook Specification 2.5 and Model Card Specification 1.1,\" fleet specifications in the ml-worker repository."
     ),
 }

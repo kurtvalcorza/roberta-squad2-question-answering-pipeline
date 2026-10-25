@@ -309,5 +309,5 @@ def test_rqa_m5_minor_timings_name_their_environment(notebook):
 
 
 def test_rqa_s1_declares_notebook_spec_2_2(notebook):
-    assert notebook["metadata"]["dimer"]["notebook_spec"] == "2.2"
+    assert notebook["metadata"]["dimer"]["notebook_spec"] == "2.5" and notebook["metadata"]["dimer"]["notebook_kind"] == "TUTORIAL"
     assert "NOTEBOOK_SPEC 2.0" not in TEMPLATE.read_text(encoding="utf-8")

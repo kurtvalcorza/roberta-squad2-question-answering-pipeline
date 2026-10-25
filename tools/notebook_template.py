@@ -48,7 +48,7 @@ TEMPLATE = {
         "fresh pipeline to verify answer parity. The default path needs no repository clone, no DIMER worker or service, "
         "no credential, no upload dialog and no configuration edit (NOTEBOOK_SPEC 2.2 §5). On the local CPU build workstation "
         "(Windows, Intel Core Ultra 9 275HX, float32) the model stages took about six minutes after the downloads; Colab's CPU "
-        "runtime is unmeasured and likely several times slower (an estimate). A CUDA runtime is used automatically when "
+        "runtime is likely several times slower (an estimate, not a measurement). A CUDA runtime is used automatically when "
         "present: on a Colab T4 the recorded hosted runs of the whole notebook took 228.6 s (blob `35bae728`, 9 October 2026), 169.3 s (`f8a79e6e`, 25 October 2026) and 165.3 s (`2ab5ce3c`, 25 October 2026); your run may take a different time."
     ),
     "byod": (

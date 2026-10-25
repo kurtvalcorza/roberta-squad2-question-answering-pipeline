@@ -22,8 +22,8 @@ def test_timings_are_approximate_and_name_the_runtime():
 
 
 def test_historical_wording_records_every_hosted_run():
-    # Historical wording (2026-10-26): timings and claims are records of the named hosted runs, never expectations;
-    # no run-status sentence. Fails on PR #10 head c1ca9d9.
+    # Historical wording (2026-10-26): timings and claims are records of the named hosted runs,
+    # never expectations; no run-status sentence. Fails on PR #10 head c1ca9d9.
     md = _markdown()
     for gone in ("about 3–4 minutes", "none of these is a run of this revision", "Expect the frozen F1",
                  "Watch validation F1 roughly double", "Expect the answered rate", "is unmeasured"):

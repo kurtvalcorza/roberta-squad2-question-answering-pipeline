@@ -304,8 +304,8 @@ def test_rqa_m3_minor_section_9_states_the_provenance(notebook):
 
 def test_rqa_m5_minor_timings_name_their_environment(notebook):
     text = _markdown(notebook)
-    assert "Intel Core Ultra 9 275HX" in text and "Colab's CPU runtime is unmeasured" in text
-    assert "about 3.5 minutes per epoch on the local CPU build workstation" in text
+    assert "Intel Core Ultra 9 275HX" in text and "(an estimate, not a measurement)" in text
+    assert "the local CPU build workstation took about 3.5 minutes per epoch" in text
 
 
 def test_rqa_s1_declares_notebook_spec_2_2(notebook):

@@ -129,7 +129,7 @@ def test_rqa_m2_section_8_splits_the_gain_and_reports_the_forced_span_row(notebo
 def test_rqa_m2_prose_no_longer_credits_the_whole_rise_to_reading(notebook):
     text = _markdown(notebook)
     assert "**forced-span baseline**" in text and "null suppression" in text.lower()
-    assert "Almost all of that F1 rise is null suppression, not better reading" in text
+    assert "In those runs almost all of that F1 rise was null suppression, not better reading" in text
     assert "it is not evidence that the adapted model reads adversarial questions better" in text
     assert "allow_null=False" in _cell(notebook, "frozen_forced_test = pipe.evaluate(")
 

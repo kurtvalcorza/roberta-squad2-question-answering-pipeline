@@ -17,6 +17,17 @@ def _markdown():
 
 def test_timings_are_approximate_and_name_the_runtime():
     md = _markdown()
-    for exact in ("228.6 s", "169.3 s", "306 s"):
-        assert exact not in md, exact
-    assert md.count("about 3–4 minutes") == 2 and "`f8a79e6e`" in md
+    # Historical wording (2026-10-26): exact recorded times are allowed again, each labelled with its run.
+    assert md.count("228.6 s (blob `35bae728`, 9 October 2026), 169.3 s") == 2 and "`f8a79e6e`" in md
+
+
+def test_historical_wording_records_every_hosted_run():
+    # Historical wording (2026-10-26): timings and claims are records of the named hosted runs, never expectations;
+    # no run-status sentence. Fails on PR #10 head c1ca9d9.
+    md = _markdown()
+    for gone in ("about 3–4 minutes", "none of these is a run of this revision", "Expect the frozen F1",
+                 "Watch validation F1 roughly double", "Expect the answered rate", "is unmeasured"):
+        assert gone not in md, gone
+    for quoted in ("165.3 s (`2ab5ce3c`, 25 October 2026)", "`2ab5ce3c` (commit `08e1cd1`, 25 October 2026)",
+                   "your run may take a different time", "this can vary between runs"):
+        assert quoted in md, quoted

@@ -49,7 +49,7 @@ TEMPLATE = {
         "no credential, no upload dialog and no configuration edit (NOTEBOOK_SPEC 2.2 §5). On the local CPU build workstation "
         "(Windows, Intel Core Ultra 9 275HX, float32) the model stages took about six minutes after the downloads; Colab's CPU "
         "runtime is unmeasured and likely several times slower (an estimate). A CUDA runtime is used automatically when "
-        "present: on a Colab T4 the whole notebook takes about 3–4 minutes (the hosted runs of blobs `35bae728` on 9 October 2026 and `f8a79e6e` on 25 October 2026)."
+        "present: on a Colab T4 the recorded hosted runs of the whole notebook took 228.6 s (blob `35bae728`, 9 October 2026), 169.3 s (`f8a79e6e`, 25 October 2026) and 165.3 s (`2ab5ce3c`, 25 October 2026); your run may take a different time."
     ),
     "byod": (
         "After the tutorial workflow completes, set `USE_BYOD = True` in Section 4 and re-run from that cell to supply your own "
@@ -79,7 +79,7 @@ TEMPLATE = {
             'package and the model snapshot — and their cells are collapsed; you may run them without studying them. The learning path starts in Section 4. Form '
             'fields (`# @param`) are the only values meant to be edited, and the defaults reproduce the recorded run. Before each principal result the notebook '
             'asks you to **Predict**; after it come **What to notice** and a collapsible **Check your reasoning** with a worked answer quoted from a recorded run, '
-            'not re-run here: **the recorded run** is the Colab T4 run of blob `35bae728` (commit `d3db894`, 9 October 2026), recorded in `docs/release-verification.md`. Every adaptation starts from the pinned base, so re-running '
+            'not re-run here: **the recorded run** means each of the hosted Colab T4 runs of blobs `35bae728` (commit `d3db894`, 9 October 2026), `f8a79e6e` (commit `9f02257`, 25 October 2026) and `2ab5ce3c` (commit `08e1cd1`, 25 October 2026), recorded in `docs/release-verification.md`, which printed the same metrics. Every adaptation starts from the pinned base, so re-running '
             'Section 7 with other settings is a fresh experiment. **Troubleshooting**, a **Glossary** and a **Conclusion** template are at the end. Writing your '
             'predictions down is optional.\n\n**Roadmap:** 1–3 infrastructure → 4 the AdversarialQA corpus, validation and the split *(evaluation practice)* → 5 the '
             'fit check and the inference contract *(core concept: spans, no-answer, scores)* → 6 baselines and the frozen model *(evaluation practice)* → 7 bounded '
@@ -171,7 +171,7 @@ TEMPLATE = {
         "repository exposes none of these."
     ),
     "prerequisites": [
-        "- **Runtime:** a fresh supported runtime (Google Colab or Jupyter, Python 3.12). The default path runs on CPU (float32) and uses CUDA automatically when available. CPU is adequate but not fast: the local build workstation (Windows, Intel Core Ultra 9 275HX, float32 — not a hosted runtime) measured 6 s to load and digest-verify the 498 MB snapshot, 20 s to answer the 400-question test split, and about 3.5 minutes per epoch of fine-tuning the last two encoder blocks and the span head on 1,000 questions (validation scoring included); Colab's CPU runtime is unmeasured and likely several times slower (an estimate). On a Colab T4 the whole notebook took about 3–4 minutes in the hosted runs of blobs `35bae728` (9 October 2026) and `f8a79e6e` (25 October 2026), and an earlier blob's Kaggle T4 run of 19 September 2026 took about 5 minutes; none of these is a run of this revision. Building the isolated environment (the pinned `torch==2.14.0` among its packages; reused on a re-run) and the 496 MB checkpoint are the large downloads of the run.",
+        "- **Runtime:** a fresh supported runtime (Google Colab or Jupyter, Python 3.12). The default path runs on CPU (float32) and uses CUDA automatically when available. CPU is adequate but not fast: the local build workstation (Windows, Intel Core Ultra 9 275HX, float32 — not a hosted runtime) measured 6 s to load and digest-verify the 498 MB snapshot, 20 s to answer the 400-question test split, and about 3.5 minutes per epoch of fine-tuning the last two encoder blocks and the span head on 1,000 questions (validation scoring included); Colab's CPU runtime is likely several times slower (an estimate, not a measurement). On a Colab T4 the recorded hosted runs of the whole notebook took 228.6 s (blob `35bae728`, 9 October 2026), 169.3 s (`f8a79e6e`, 25 October 2026) and 165.3 s (`2ab5ce3c`, 25 October 2026), and an earlier blob's Kaggle T4 run of 19 September 2026 took about 5 minutes; your run may take a different time. Building the isolated environment (the pinned `torch==2.14.0` among its packages; reused on a re-run) and the 496 MB checkpoint are the large downloads of the run.",
         "- **Knowledge:** basic Python; what an encoder-only Transformer is; what span extraction means; why a reader can return a fluent-looking wrong span, or an empty answer for a question the passage does answer; what exact-match and F1 measure and why neither is a human judgement.",
         "- **Data contract:** records are `{id, question, context, answers}` — a question, its passage and a list of `{text, answer_start}` gold spans (empty for unanswerable), each `text` found verbatim at its offset; questions at most `MAX_QUESTION_CHARS` (500) characters and `MAX_QUESTION_TOKENS` (64) BPE tokens, passages at most `MAX_CONTEXT_CHARS` (3,000) characters and `MAX_CONTEXT_TOKENS` (384) tokens, enforced by rejecting, never by truncating or windowing; ids matching `[A-Za-z0-9_.:-]{1,64}` and unique; a training split needs 8..20,000 records, so a BYOD dataset needs **at least 12 records** with one question per passage (8 stay for training after the 20 % test and 15 % validation splits) and more when several questions share a passage, because they stay together; validation and test need at least one record each; every question on the same passage lands in the same split so a test passage is never trained on. BYOD accepts a JSON array, SQuAD-format JSON, JSONL or CSV in that shape.",
         "- **Validation is structural, not semantic:** nothing checks that a question is answerable from its passage beyond the gold text being present at its offset, or that a gold span is the *best* answer — a mislabelled corpus is fine-tuned on without complaint.",
@@ -367,9 +367,9 @@ TEMPLATE = {
                 "test questions with the `max_answer_tokens` from Section 5 and is scored with the same two metrics: corpus "
                 "**exact-match** and **F1** with the official SQuAD 2.0 normalisation (lower-case, punctuation and articles "
                 "stripped; an empty gold matches only an empty prediction). Read `answered_rate` beside them: the fraction of "
-                "questions for which a span was returned at all. Expect the frozen F1 to be low — these questions were "
-                "selected because a RoBERTa reader failed them — and expect the null answer for roughly half of the test "
-                "questions, a systematic under-answering. The fourth number is the **forced-span baseline**: the same frozen model "
+                "questions for which a span was returned at all. In the recorded run the frozen F1 was low — these questions were "
+                "selected because a RoBERTa reader failed them — and the null answer came back for more than half of the test "
+                "questions (43.5 % answered), a systematic under-answering; this can vary between runs. The fourth number is the **forced-span baseline**: the same frozen model "
                 "with the empty answer disabled (`allow_null=False`), so it always returns its best span. It needs no training, "
                 "and on a corpus with no unanswerable questions it shows how much of the frozen model's low score is abstaining "
                 "rather than misreading. `f1_answered` is the F1 over only the questions that got a span. Whether the frozen F1 beats "
@@ -422,8 +422,8 @@ TEMPLATE = {
                 "seeded shuffling and no scheduler. Nothing is truncated: every training record passed the fit check. "
                 "Epoch 0 records the frozen model's validation exact-match and F1; every epoch is scored on the "
                 "validation split, and the epoch with the highest validation F1 is kept.\n\n"
-                "Watch validation F1 roughly double in the first epoch and the answered rate jump to 100 % (about 3.5 "
-                "minutes per epoch on the local CPU build workstation, validation scoring included; Colab CPU is slower, a T4 GPU much faster). The default configuration was chosen during "
+                "In the recorded run validation F1 roughly doubled in the first epoch (14.14 → 32.39) and the answered rate jumped to 100 %; watch "
+                "whether yours does (the local CPU build workstation took about 3.5 minutes per epoch, validation scoring included; the recorded Colab T4 runs took far less). The default configuration was chosen during "
                 "development; which configurations were tried, and on which split their gain was measured, is not recorded in "
                 "this repository, so if the choice used test F1 the Section 8 test numbers are optimistic. Every call starts from the "
                 "pinned base (`started_from` in the printed result), so a re-run with other settings is a fresh experiment, not "
@@ -453,7 +453,7 @@ TEMPLATE = {
         {
             "md": (
                 '**What to notice:** epoch 0 (`note: frozen model`), validation F1 and answered rate per epoch, `best_epoch`, and `started_from`.\n\n<details><summary>Check '
-                'your reasoning</summary>It moves: validation F1 roughly doubles in the first epoch and the answered rate jumps to 100 %. Much of the gain is the model '
+                'your reasoning</summary>It moved: in the recorded run validation F1 roughly doubled in the first epoch (14.14 → 32.39) and the answered rate jumped to 100 %; this can vary between runs. Much of the gain is the model '
                 'learning to stop abstaining on a corpus with no unanswerable questions — Section 8 compares it with the forced-span baseline to show how much — and that is also a cost.</details>'
             ),
         },
@@ -634,9 +634,9 @@ TEMPLATE = {
     ],
     "closing": (
         "## Interpretation and limits\n\n"
-        "The frozen model fails most adversarial questions — its test F1 sits near the lexical-overlap baseline and it "
-        "returns the empty answer for more than half of the answerable questions — and a bounded fine-tuning of the last two "
-        "encoder blocks and the span head on 1,000 in-distribution questions roughly doubles held-out F1 and lifts the "
+        "In the recorded run (blobs `35bae728` (commit `d3db894`, 9 October 2026), `f8a79e6e` (commit `9f02257`, 25 October 2026) and `2ab5ce3c` (commit `08e1cd1`, 25 October 2026)) the frozen model failed most adversarial questions — its test F1 (12.38) sat near the lexical-overlap baseline (8.58) and it "
+        "returned the empty answer for more than half of the answerable questions — and a bounded fine-tuning of the last two "
+        "encoder blocks and the span head on 1,000 in-distribution questions roughly doubled held-out F1 (to 25.81) and lifted the "
         "answered rate to 100 %, with a 57 MB adapter that reloads to identical answers. **Almost all of that F1 rise is null "
         "suppression, not better reading:** the frozen model with the empty answer disabled — no training — scores within about "
         "a point of the adapted model (Section 8's `f1_gain_parts`), and one seeded split with no dispersion estimate cannot "
@@ -679,9 +679,9 @@ TEMPLATE = {
         "5. **Explain.** Say in one sentence whether the smaller adapter changed the *better reading* part, and what that tells you "
         "about where the gain on this corpus comes from.\n\n"
         "To put the notebook back to the recorded state, set `TRAINABLE_ENCODER_LAYERS = 2` and run Sections 6, 7, 8 and 9 again.\n\n"
-        "<details><summary>Check your reasoning</summary>Expect the answered rate to reach 100 % again and F1 to land near the "
-        "forced-span frozen F1: stopping abstention needs little capacity, so one block and the span head are enough for it. The "
-        "*better reading* part stays within about a point either way. The exact figures depend on the device; what matters is "
+        "<details><summary>Check your reasoning</summary>No recorded number answers this; the reasoning: stopping abstention needs little capacity, so one block and the "
+        "span head may be enough to lift the answered rate to 100 % again, with F1 near the forced-span frozen F1 (25.28 in the "
+        "recorded run). Compare with your own numbers rather than with a target. The exact figures depend on the device; what matters is "
         "that the same starting point and the null-suppression share hold.</details>\n\n"
         "**More experiments (same procedure: re-run from Section 6, or from Section 4 for BYOD; they do not affect the default path):** "
         "raise `EPOCHS` and watch the validation F1 pick the epoch; add unanswerable records to a BYOD set (empty `answers`) and "

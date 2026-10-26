@@ -129,7 +129,7 @@ def test_rqa_m2_section_8_splits_the_gain_and_reports_the_forced_span_row(notebo
 def test_rqa_m2_prose_no_longer_credits_the_whole_rise_to_reading(notebook):
     text = _markdown(notebook)
     assert "**forced-span baseline**" in text and "null suppression" in text.lower()
-    assert "Almost all of that F1 rise is null suppression, not better reading" in text
+    assert "In those runs almost all of that F1 rise was null suppression, not better reading" in text
     assert "it is not evidence that the adapted model reads adversarial questions better" in text
     assert "allow_null=False" in _cell(notebook, "frozen_forced_test = pipe.evaluate(")
 
@@ -304,10 +304,10 @@ def test_rqa_m3_minor_section_9_states_the_provenance(notebook):
 
 def test_rqa_m5_minor_timings_name_their_environment(notebook):
     text = _markdown(notebook)
-    assert "Intel Core Ultra 9 275HX" in text and "Colab's CPU runtime is unmeasured" in text
-    assert "about 3.5 minutes per epoch on the local CPU build workstation" in text
+    assert "Intel Core Ultra 9 275HX" in text and "(an estimate, not a measurement)" in text
+    assert "the local CPU build workstation took about 3.5 minutes per epoch" in text
 
 
 def test_rqa_s1_declares_notebook_spec_2_2(notebook):
-    assert notebook["metadata"]["dimer"]["notebook_spec"] == "2.2"
+    assert notebook["metadata"]["dimer"]["notebook_spec"] == "2.5" and notebook["metadata"]["dimer"]["notebook_kind"] == "TUTORIAL"
     assert "NOTEBOOK_SPEC 2.0" not in TEMPLATE.read_text(encoding="utf-8")

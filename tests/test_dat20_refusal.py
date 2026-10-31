@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -276,3 +277,68 @@ def test_default_path_contract_failure_is_not_a_refusal(cells, tmp_path, monkeyp
         exec(compile(_cell_code(cells, None), "<section 4>", "exec"), ns)
     assert not getattr(caught.value, "dimer_refusal", False)
     assert ns["comparison"] == "old"
+
+
+# --- the catch is narrow: only bad input is refused; an internal TypeError/KeyError/OSError keeps its traceback -------
+
+
+def test_the_byod_catches_are_narrow_in_the_notebook_source(cells):
+    source = _source(_byod_cell(cells))
+    body = source.split("if USE_BYOD:\n", 1)[1].split("articles = {", 1)[0]
+    caught = re.findall(r"^\s*except (.+?)(?: as \w+)?:$", body, flags=re.M)
+    assert caught == ["ImportError", "OSError", "(TypeError, KeyError)", "BYODRefusal", "ValueError", "ValueError"], caught
+    assert "        try:\n            records = load_byod_dataset(byod_path)\n        except OSError as exc:\n" in body
+
+
+@pytest.mark.parametrize(
+    ("name", "content", "rule"),
+    [
+        ("squad.json", json.dumps({"data": [{"title": "t", "paras": []}]}), "a record is malformed (KeyError: 'paragraphs')"),
+        ("short.csv", "id,question,context,answer_text,answer_start\nr000,Where?,In Paris.,Paris\n", "a record is malformed (TypeError: "),
+    ],
+    ids=["SQuAD article without paragraphs", "CSV row without answer_start"],
+)
+def test_a_malformed_record_is_still_one_refused_line(cells, tmp_path, monkeypatch, name, content, rule):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setitem(sys.modules, "google.colab", None)
+    (tmp_path / name).write_text(content, encoding="utf-8")
+    _refused(cells, tmp_path, str(tmp_path / name), name, rule)
+
+
+def test_an_unreadable_file_is_still_one_refused_line(cells, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setitem(sys.modules, "google.colab", None)
+    data = tmp_path / "pairs.json"
+    data.write_text("[]", encoding="utf-8")
+    ns = _namespace(tmp_path)
+
+    def unreadable(path):
+        raise PermissionError(13, "Permission denied", str(path))
+
+    ns["load_byod_dataset"] = unreadable
+    with pytest.raises(ValueError) as caught:
+        exec(compile(_cell_code(cells, str(data)), "<section 4>", "exec"), ns)
+    _one_line(caught.value, "pairs.json", "the file cannot be read (PermissionError: ")
+
+
+@pytest.mark.parametrize("helper", ["split_dataset", "check_split_disjoint"])
+@pytest.mark.parametrize("error", [TypeError("internal helper bug"), KeyError("internal key"), OSError("internal I/O bug")], ids=["TypeError", "KeyError", "OSError"])
+def test_an_internal_error_after_the_loader_keeps_its_traceback(cells, tmp_path, monkeypatch, helper, error):
+    import traceback
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setitem(sys.modules, "google.colab", None)
+    data = tmp_path / "pairs.json"
+    data.write_text(json.dumps([_record(i) for i in range(30)]), encoding="utf-8")
+    ns = _namespace(tmp_path)
+
+    def broken(*args, **kwargs):
+        raise error
+
+    ns[helper] = broken
+    with pytest.raises(type(error)) as caught:
+        exec(compile(_cell_code(cells, str(data)), "<section 4>", "exec"), ns)
+    assert caught.value is error and not getattr(caught.value, "dimer_refusal", False)
+    rendered = "".join(traceback.format_exception(caught.value))
+    assert rendered.startswith("Traceback") and "broken" in rendered and "Refused:" not in rendered
+    assert ns["comparison"] == "old" and (tmp_path / "outputs" / f"{STEM}_result.json").exists()  # nothing is cleared for an internal error

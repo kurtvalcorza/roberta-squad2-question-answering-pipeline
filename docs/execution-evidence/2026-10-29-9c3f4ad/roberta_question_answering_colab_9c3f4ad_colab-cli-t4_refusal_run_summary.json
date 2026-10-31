@@ -1,0 +1,71 @@
+{
+  "repo": "roberta-squad2-question-answering-pipeline",
+  "sha": "9c3f4adcad69c860110b8d6ed32e8c92d21b991a",
+  "notebook": "tutorials/roberta_question_answering_colab.ipynb",
+  "blob": "148a73601171c76a8015fda9f2b8e20da276eba3",
+  "gpu": "T4",
+  "session": "suite-roberta-9c3f4ad-be4a",
+  "started_utc": "2026-10-29T23:17:08+00:00",
+  "runner": "Colab CLI `colab exec -f` on a fresh session (not a browser Run all)",
+  "overrides": [
+    {
+      "name": "USE_BYOD",
+      "from": "False",
+      "to": "True"
+    },
+    {
+      "name": "BYOD_PATH",
+      "from": "''",
+      "to": "'/content/sample_data/california_housing_test.csv'"
+    }
+  ],
+  "run_copy_blob": "675bacadffb264f95ee9850aa80e3f28fc41e434",
+  "run_copy_sha256": "50aa3fc194da48a9199c340da4ff3560ae1c0c10256e01071b77527f12351454",
+  "run_copy_note": "refusal run: the run copy is the committed notebook with the listed assignment overrides, cut immediately after the refusal cell and re-serialised (nbformat layout); input_unchanged compares against that copy",
+  "truncated_after_cell": "roberta_question_answering-16",
+  "refusal_cell_ref": "roberta_question_answering-16",
+  "refusal_cell_index": 7,
+  "cells_dropped": 17,
+  "code_cells_dropped": 5,
+  "original_sha256": "e628a415ae7c5853f2f21e25436520f23880efcca63b14a0b3ad1e7c79b6a5d9",
+  "status": "[suite-roberta-9c3f4ad-be4a] gpu-t4-s-usw1b3-gvekbtptq0n9 | Hardware: T4 | Shape: Standard | Variant: GPU | Status: IDLE",
+  "exec_exit_code": 0,
+  "stopped": true,
+  "stop_verified": true,
+  "wall_s": 95.9,
+  "input_unchanged": true,
+  "executed_file": "roberta_question_answering_colab_9c3f4ad_colab-cli-t4_output.ipynb",
+  "log_cells": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "log_total": 7,
+  "code_cells": 7,
+  "executed_cells": 4,
+  "errors": [
+    {
+      "cell": "roberta_question_answering-16",
+      "ename": "IsolatedCellRefusal",
+      "evalue": "california_housing_test.csv: CSV is missing columns ['answer_start', 'answer_text', 'context', 'id', 'question']; fix the file and run this cell again (the earlier results of this session were removed)."
+    }
+  ],
+  "execution_counts": [],
+  "sequential": null,
+  "executed_sha256": "4220202b77170f5929d4d8d9d1fc461381717003cd3a0a850fd53d30d0fce7fa",
+  "log_sequential_complete": true,
+  "mode": "expect_refusal",
+  "refusal_line": "Refused: california_housing_test.csv: CSV is missing columns ['answer_start', 'answer_text', 'context', 'id', 'question']; fix the file and run this cell again (the earlier results of this session were removed).",
+  "halting_cell_index": 7,
+  "halting_cell_id": "roberta_question_answering-16",
+  "error_cells": [
+    7
+  ],
+  "refusal_fail_reasons": [],
+  "refusal_ok": true,
+  "verdict": "PASS"
+}

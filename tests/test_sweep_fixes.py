@@ -249,7 +249,7 @@ def test_swp_f_restore_base_puts_trained_tensors_back_and_detaches_the_adapter()
 
 def _byod_block(notebook: dict) -> str:
     source = _cell(notebook, "BYOD_PATH = ")
-    return source[source.index("if USE_BYOD:") : source.index(BYOD_END)]
+    return source[source.index("class BYODRefusal(ValueError):") : source.index(BYOD_END)]
 
 
 def _byod_namespace(path: str) -> dict:
@@ -273,9 +273,9 @@ def test_swp_b_byod_path_reads_a_file_without_colab(notebook, tmp_path, monkeypa
 def test_swp_b_missing_path_and_off_colab_upload_give_clear_messages(notebook, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setitem(sys.modules, "google.colab", None)
-    with pytest.raises(FileNotFoundError, match="BYOD_PATH 'nope.csv' is not a file"):
+    with pytest.raises(ValueError, match="nope.csv: BYOD_PATH 'nope.csv' is not a file"):  # DAT20: a BYODRefusal
         exec(compile(_byod_block(notebook), "<byod>", "exec"), _byod_namespace("nope.csv"))
-    with pytest.raises(RuntimeError, match="upload dialog exists only in Google Colab"):
+    with pytest.raises(ValueError, match="upload dialog exists only in Google Colab"):  # DAT20: a BYODRefusal
         exec(compile(_byod_block(notebook), "<byod>", "exec"), _byod_namespace(""))
 
 

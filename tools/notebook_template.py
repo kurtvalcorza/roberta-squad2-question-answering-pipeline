@@ -245,6 +245,10 @@ TEMPLATE = {
                 "    raise BYODRefusal(file_name, reason + ' (the earlier results of this session were removed).') from None\n\n\n"
                 'if USE_BYOD:\n'
                 '    # DAT20: every problem with your file (path, upload, format, fields, split, validation) stops here as one Refused: line.\n'
+                '    # Caught: ValueError (the loader, the splitter and the validators raise it for bad content; a decoding or JSON error\n'
+                '    # is one) and, only around load_byod_dataset, OSError (the file cannot be read) and TypeError / KeyError, which\n'
+                '    # flatten_squad and the CSV reader raise for a malformed SQuAD article or CSV row. After the loader every record is\n'
+                '    # checked with ValueError, so a TypeError, KeyError or OSError there is a bug and keeps its traceback.\n'
                 "    file_name = Path(BYOD_PATH.strip()).name if BYOD_PATH.strip() else '(no file)'\n"
                 '    try:\n'
                 '        if BYOD_PATH.strip():\n'
@@ -265,11 +269,16 @@ TEMPLATE = {
                 "            byod_path = Path('work') / file_name\n"
                 '            byod_path.parent.mkdir(parents=True, exist_ok=True)\n'
                 '            byod_path.write_bytes(payload)\n'
-                '        records = load_byod_dataset(byod_path)\n'
+                '        try:\n'
+                '            records = load_byod_dataset(byod_path)\n'
+                '        except OSError as exc:\n'
+                "            raise BYODRefusal(file_name, f'the file cannot be read ({{type(exc).__name__}}: {{exc}}); give one .json, .jsonl, .csv file this runtime can read.') from None\n"
+                '        except (TypeError, KeyError) as exc:\n'
+                "            raise BYODRefusal(file_name, f'a record is malformed ({{type(exc).__name__}}: {{exc}}): every SQuAD article needs paragraphs, every paragraph a context and qas, every question an id, a question and answers of text and an integer answer_start, and every CSV row all five columns.') from None\n"
                 '        splits = split_dataset(records, seed=SPLIT_SEED)\n'
                 '    except BYODRefusal as exc:\n'
                 '        refuse_byod(exc.file_name, exc.reason)\n'
-                '    except (TypeError, ValueError, KeyError, OSError) as exc:\n'
+                '    except ValueError as exc:\n'
                 '        refuse_byod(file_name, exc)\n'
                 "    data_source = 'BYOD (' + file_name + ')'\n"
                 "    raw_questions = {{'byod': len(records)}}\n"
@@ -282,7 +291,7 @@ TEMPLATE = {
                 'try:\n'
                 "    dataset_manifests = {{name: validate_dataset(part) if name == 'train' else validate_dataset(part, min_records=1) for name, part in splits.items()}}\n"
                 '    disjoint = check_split_disjoint(splits)\n'
-                'except (TypeError, ValueError, KeyError) as exc:\n'
+                'except ValueError as exc:\n'
                 '    if not USE_BYOD:\n'
                 '        raise  # the pinned sample failing its contract is a genuine error, not a refusal\n'
                 '    refuse_byod(file_name, exc)\n'
